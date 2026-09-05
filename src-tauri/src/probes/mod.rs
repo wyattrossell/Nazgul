@@ -7,8 +7,11 @@
 pub mod crypto;
 pub mod domain;
 pub mod email;
+pub mod geo;
 pub mod image;
 pub mod ip;
+pub mod launchers;
+pub mod org;
 pub mod payments;
 pub mod person;
 pub mod phone;
@@ -43,6 +46,10 @@ pub enum ProbeKind {
     Plugin,
     /// A person's name: handle candidates, payment apps, people search.
     Person,
+    /// Coordinates or a place name.
+    Geo,
+    /// A company or organisation name.
+    Org,
 }
 
 impl ProbeKind {
@@ -57,6 +64,8 @@ impl ProbeKind {
             ProbeKind::Crypto => "crypto",
             ProbeKind::Plugin => "plugin",
             ProbeKind::Person => "person",
+            ProbeKind::Geo => "geo",
+            ProbeKind::Org => "org",
         }
     }
 
@@ -81,6 +90,8 @@ impl ProbeKind {
             ProbeKind::Crypto => EntityType::Wallet,
             ProbeKind::Plugin => EntityType::Url,
             ProbeKind::Person => EntityType::Person,
+            ProbeKind::Geo => EntityType::Location,
+            ProbeKind::Org => EntityType::Org,
         }
     }
 }
@@ -98,6 +109,7 @@ pub enum EntityType {
     Person,
     Org,
     Url,
+    Location,
 }
 
 impl EntityType {
@@ -113,6 +125,7 @@ impl EntityType {
             EntityType::Person => "person",
             EntityType::Org => "org",
             EntityType::Url => "url",
+            EntityType::Location => "location",
         }
     }
 
@@ -486,6 +499,8 @@ pub async fn run_scan_with_secrets(
         ProbeKind::Crypto => crypto::run(ctx.clone()).await,
         ProbeKind::Plugin => plugin::run(ctx.clone()).await,
         ProbeKind::Person => person::run(ctx.clone()).await,
+        ProbeKind::Geo => geo::run(ctx.clone()).await,
+        ProbeKind::Org => org::run(ctx.clone()).await,
     };
 
     let (total, checked, found) = ctx.snapshot();

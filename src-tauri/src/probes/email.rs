@@ -9,6 +9,7 @@ use md5::{Digest, Md5};
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 
+use super::launchers;
 use super::payments;
 use super::{EntityType, Finding, FindingStatus, ScanContext};
 use crate::engine::dns;
@@ -284,8 +285,10 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let hibp_key = ctx.secret("hibp").map(str::to_string);
     let candidates = username_candidates(&local);
     let payment_handles: Vec<String> = candidates.iter().take(4).cloned().collect();
+    let catalog = launchers::plan(EntityType::Email, &launchers::vars_email(&email));
     ctx.start(
-        8 + CHECKS.len()
+        9 + CHECKS.len()
+            + catalog.len()
             + payments::MANUAL_LAUNCHER_COUNT
             + payments::handle_check_count(payment_handles.len())
             + if hibp_key.is_some() { 2 } else { 0 },
@@ -517,6 +520,43 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
                 "githubCode": format!("https://github.com/search?type=code&q={}", urlencode(&q)),
             })),
     );
+
+    // EmailRep reputation (free tier without a key, more with one).
+    let mut rep = ctx.finding("EmailRep", "reputation", "EmailRep reputation").category("reputation")
+        .url(format!("https://emailrep.io/{}", encode(&email)));
+    let mut req = ctx.client.get(format!("https://emailrep.io/{}", encode(&email))).header("User-Agent", "nazgul-osint");
+    if let Some(key) = ctx.secret("emailrep") {
+        req = req.header("Key", key);
+    }
+    match fetch(req).await {
+        Err((e, ms)) => { rep.elapsed_ms = ms; rep = rep.error(e); }
+        Ok(res) => {
+            rep.elapsed_ms = res.elapsed_ms;
+            rep.http_status = Some(res.status);
+            let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+            if res.status == 200 && v["reputation"].is_string() {
+                let d = &v["details"];
+                let profiles: Vec<String> = d["profiles"].as_array().map(|a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                let mut flags = Vec::new();
+                for (key, label) in [("credentials_leaked", "credentials leaked"), ("data_breach", "in a breach"), ("malicious_activity", "malicious activity"), ("spam", "spam source"), ("disposable", "disposable"), ("free_provider", "free provider"), ("deliverable", "deliverable")] {
+                    if d[key].as_bool().unwrap_or(false) {
+                        flags.push(label);
+                    }
+                }
+                let seen = d["first_seen"].as_str().filter(|s| *s != "never").map(|s| format!(" · first seen {s}")).unwrap_or_default();
+                rep = rep
+                    .status(if !profiles.is_empty() || d["credentials_leaked"].as_bool().unwrap_or(false) { FindingStatus::Found } else { FindingStatus::Info })
+                    .summary(format!("reputation {} · {} reference(s){}{}{}", v["reputation"].as_str().unwrap_or("?"), v["references"].as_u64().unwrap_or(0), if profiles.is_empty() { String::new() } else { format!(" · profiles: {}", profiles.join(", ")) }, if flags.is_empty() { String::new() } else { format!(" · {}", flags.join(", ")) }, seen))
+                    .data(v.clone());
+            } else if res.status == 429 {
+                rep = rep.status(FindingStatus::Info).summary("EmailRep daily quota reached; add a key in Settings or open the page");
+            } else {
+                rep = rep.status(FindingStatus::Ambiguous).detail(format!("HTTP {}: {}", res.status, v["reason"].as_str().unwrap_or("")));
+            }
+        }
+    }
+    ctx.emit(rep);
+    launchers::emit(&ctx, &catalog);
 
     // Payment apps: launchers that prefill the address in the user's own apps, then public
     // handle pages for the username candidates.

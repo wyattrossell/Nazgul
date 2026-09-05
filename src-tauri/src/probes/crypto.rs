@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sha3::Keccak256;
 
+use super::launchers;
 use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::http::{build_following_client, fetch};
 
@@ -184,11 +185,12 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     };
     let follower = build_following_client(&ctx.options.http_options()).map_err(|e| e.to_string())?;
 
-    // classification, balance, (ens), launchers x2
+    // classification, balance, (ens), launchers x2, catalog
+    let catalog = launchers::plan(EntityType::Wallet, &launchers::vars_wallet(&addr));
     ctx.start(match info.chain {
         Chain::Ethereum => 5,
         _ => 4,
-    });
+    } + catalog.len());
 
     let chain_name = match info.chain {
         Chain::Bitcoin => "Bitcoin",
@@ -312,5 +314,6 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         }
     }
 
+    launchers::emit(&ctx, &catalog);
     Ok(())
 }

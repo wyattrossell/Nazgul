@@ -285,6 +285,17 @@ pub async fn check_route(proxy: Option<String>) -> RouteStatus {
     }
 }
 
+/// Saves a horizontally flipped copy of an image next to the original (defeats naive reverse-image indexes).
+#[tauri::command]
+pub fn save_flipped_image(path: String) -> Result<String, String> {
+    probes::image::save_flipped(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+pub fn launcher_catalog() -> Vec<probes::launchers::Launcher> {
+    probes::launchers::CATALOG.clone()
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginList {

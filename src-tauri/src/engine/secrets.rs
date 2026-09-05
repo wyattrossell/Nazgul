@@ -17,6 +17,7 @@ pub const KEYS: &[(&str, &str, &str)] = &[
     ("hunter", "Hunter.io", "Email addresses and patterns for a domain"),
     ("numverify", "NumVerify", "Carrier, line type and location for a phone number"),
     ("virustotal", "VirusTotal", "Reputation for domains and IPs"),
+    ("emailrep", "EmailRep", "Raises the emailrep.io quota (works without a key at a few queries per day)"),
 ];
 
 #[derive(Debug, Clone, Serialize)]

@@ -10,7 +10,7 @@ export interface QueuedScan {
 }
 
 export type Skin = "phosphor" | "amber" | "paper";
-export type View = "probes" | "cases" | "graph" | "history" | "settings";
+export type View = "probes" | "cases" | "graph" | "history" | "toolbox" | "settings";
 export type ResultsLayout = "cards" | "table";
 export type StatusFilter = "hits" | "all" | "issues";
 

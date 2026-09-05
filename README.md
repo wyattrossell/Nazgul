@@ -11,17 +11,36 @@ Public data only. No CAPTCHA solving, no login bypass, no scraping behind authen
 | Probe | What it does |
 |---|---|
 | **Username** | 700+ sites from the WhatsMyName list, checked in parallel. Category filters, handle variants, sequential queue. |
-| **Email** | Syntax and username candidates, disposable-domain check, MX / SPF / DMARC posture with provider guess, Gravatar profile, registration checks that never email the target (Duolingo, Mozilla, Spotify, Pinterest, Twitter, Imgur, Proton, Keybase, openpgp), payment handles on Venmo / PayPal.Me / Revolut for the candidates plus Venmo and PayPal launchers, HIBP breaches and pastes with a key, dorks. |
+| **Email** | Syntax and username candidates, disposable-domain check, MX / SPF / DMARC posture with provider guess, Gravatar profile, EmailRep reputation, registration checks that never email the target (Duolingo, Mozilla, Spotify, Pinterest, Twitter, Imgur, Proton, Keybase, openpgp), payment handles on Venmo / PayPal.Me / Revolut for the candidates plus Venmo and PayPal launchers, Epieos and IntelligenceX launchers, HIBP breaches and pastes with a key, dorks. |
 | **Phone** | libphonenumber parse (country, line type, every format), WhatsApp and Telegram links, payment-app launchers (Venmo pay flow prefilled with the number, PayPal, Cash App, Zelle notes), reverse-lookup and dork launchers, NumVerify carrier data with a key. |
 | **Name** | Handle candidates from a full name (johndoe, john.doe, jdoe...) checked on Venmo, PayPal.Me and Revolut, people-search launchers (TruePeopleSearch, FastPeopleSearch, Whitepages, Spokeo, ThatsThem), social searches (LinkedIn, Facebook, X, TikTok), and payment-site dorks. Top candidates pivot into the username probe. |
 | **Domain** | RDAP registration, A / AAAA / CNAME / NS / MX / TXT / SOA / CAA, SPF / DMARC / DKIM selectors, subdomains from crt.sh, Wayback CDX and a DNS brute-force list, web technology fingerprint, Shodan-compatible favicon hash, robots / sitemap / security.txt, launchers, plus Shodan DNS, Hunter.io and VirusTotal with keys. |
 | **IP** | Classification, reverse DNS, geolocation and ASN, Shodan InternetDB ports and CVEs, Tor exit check, RDAP allocation, launchers, plus Shodan, ipinfo, AbuseIPDB, Censys and VirusTotal with keys. |
-| **Image** | EXIF / camera / timestamp / GPS / authoring tags, dimensions, MD5 and SHA-256, reverse-image launchers. Files never leave the machine. |
+| **Location** | Coordinates (decimal or DMS) or a place name. Nominatim geocoding both ways, then Google Maps / Earth, Dual Maps, Zoom Earth, Wikimapia, Bing, Yandex, Mapillary, ADS-B Exchange, WiGLE, GeoHack, Snap Map and more, all centred on the point. |
+| **Company** | OpenCorporates search plus SAM.gov, USASpending, ProPublica nonprofits, Companies House, CompanyCheck, Moneyhouse, Crunchbase, LinkedIn companies, state public-records directory, and filing / document dorks. |
+| **File** | Images: EXIF / camera / timestamp / GPS / authoring tags, dimensions. PDFs: Info dictionary (author, creator, producer, dates). Office documents: creator, last modified by, company, application. MD5 and SHA-256, reverse-image launchers, a one-click flipped copy for defeating exact-match image indexes. Files never leave the machine. |
 | **Crypto** | Bitcoin, Litecoin and Ethereum address validation (Base58Check, bech32/bech32m, EIP-55), balance and activity from public explorers, ENS reverse lookup, explorer launchers. |
 | **Plugins** | Run external tools (Sherlock, holehe, Maigret, theHarvester, your own) from JSON manifests and capture their output as findings. |
 
-Everything a probe discovers (an email in a bio, a subdomain, a hostname behind an IP) becomes
-an **entity** in the case with a **Pivot** button, so one identifier leads to the next.
+Everything a probe discovers (an email in a bio, a subdomain, a hostname behind an IP, the
+author of a PDF, the GPS point in a photo) becomes an **entity** in the case with a **Pivot**
+button, so one identifier leads to the next.
+
+## Toolbox
+
+The Toolbox view (`Ctrl+5`) holds the hand-operated side of the craft:
+
+- **Launchers** for every identifier type, drawn from `data/launchers.json`: people-search
+  (TruePeopleSearch, ZabaSearch, FamilyTreeNow, TruthFinder, 192.com...), records (NSOPW,
+  Europol, Interpol, Black Book Online), reverse phone directories, Reddit and Instagram
+  viewers, Facebook tools, IntelligenceX, Epieos, Haveibeenzuckered, geolocation tools,
+  company registers, metadata viewers and face search. Sites without a query URL are marked
+  "paste". Open one at a time or a whole category at once.
+- **Dork builder**: exact phrase, OR groups, exclusions, `site:` and country TLD scoping,
+  `filetype:`, `inurl:`, `intitle:`, number ranges and `@`/`#` social prefixes, sent to Google,
+  Bing, DuckDuckGo, Yandex, Carrot2 or Google Images, with an operator cheat sheet.
+
+The probes emit the same launchers automatically as findings, so a scan already carries them.
 
 ## Cases, graph, history, reports
 
@@ -63,8 +82,8 @@ cargo test
 
 ## Keyboard
 
-`Ctrl+1` to `Ctrl+5` switch between Probes, Cases, Graph, History and Settings. `Esc` clears the
-selection. `Enter` in any probe form runs it.
+`Ctrl+1` to `Ctrl+6` switch between Probes, Cases, Graph, History, Toolbox and Settings. `Esc`
+clears the selection. `Enter` in any probe form runs it.
 
 ## Layout
 

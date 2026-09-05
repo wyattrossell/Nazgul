@@ -27,6 +27,8 @@
 
 - [x] Follow-up: payment apps. Name probe (handle candidates checked on Venmo / PayPal.Me / Revolut, people-search and social launchers, dorks); phone and email probes gained Venmo pay-flow and PayPal launchers and payment-handle checks. Venmo, PayPal, Cash App and Zelle expose no public phone / email / name search, so lookups by those identifiers run through the user's own logged-in app; Cash App serves a 404 shell to non-browsers, so it stays a launcher.
 
+- [x] Follow-up: class-notes sweep (NW3C CI133 / CI134 guides + Google module). Added a shared launcher catalog (data/launchers.json, ~80 tools) that every probe emits and a Toolbox view browses; a dork builder with the full operator set; Location probe (Nominatim + 16 geolocation tools); Company probe (OpenCorporates + registers); File probe now reads PDF and Office metadata and can save a flipped image copy; EmailRep reputation in the email probe; Reddit, Instagram, Facebook, people-search, records and reverse-phone tools wired into the matching probes. Not included on purpose: AI writing tools, Android emulators, Zotero/SingleFile/PDF Mage (workflow utilities), Grabify/IP Logger (tracking links), Hash Toolkit, Proton VPN / I2P (infrastructure, not lookups).
+
 Deferred: auto-update needs a signing key and a hosted update manifest, so it is documented but not wired.
 
 ---

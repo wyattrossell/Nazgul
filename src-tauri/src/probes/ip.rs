@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use serde_json::{json, Value};
 
+use super::launchers;
 use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::dns;
 use crate::engine::http::{build_following_client, fetch};
@@ -55,7 +56,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     // classification, ptr, geo, internetdb, tor, rdap, 6 launchers, + one per keyed service
     let keyed = ["shodan", "ipinfo", "abuseipdb", "virustotal"].iter().filter(|k| ctx.secret(k).is_some()).count()
         + usize::from(ctx.secret("censys_id").is_some() && ctx.secret("censys_secret").is_some());
-    ctx.start(if public { 12 + keyed } else { 2 });
+    let catalog = launchers::plan(EntityType::Ip, &launchers::vars_ip(&ip.to_string()));
+    ctx.start(if public { 12 + keyed + catalog.len() } else { 2 });
 
     ctx.emit(
         ctx.finding("parser", "classification", "Address class")
@@ -353,7 +355,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     }
 
     // Launchers.
-    let launchers: &[(&str, &str, String, &str)] = &[
+    let pages: &[(&str, &str, String, &str)] = &[
         ("Shodan", "Shodan host page", format!("https://www.shodan.io/host/{ip}"), "Banners, services and history (login for full detail)"),
         ("Censys", "Censys host page", format!("https://search.censys.io/hosts/{ip}"), "Certificates, services, autonomous system"),
         ("AbuseIPDB", "Abuse reports", format!("https://www.abuseipdb.com/check/{ip}"), "Community abuse reports and confidence score"),
@@ -361,9 +363,10 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         ("GreyNoise", "GreyNoise", format!("https://viz.greynoise.io/ip/{ip}"), "Internet-wide scanner classification"),
         ("bgp.tools", "BGP prefix", format!("https://bgp.tools/prefix/{ip}"), "Routing, upstreams, prefix ownership"),
     ];
-    for (source, title, url, summary) in launchers {
+    for (source, title, url, summary) in pages {
         ctx.emit(ctx.finding(source, "launcher", title).category("launchers").status(FindingStatus::Info).url(url.clone()).summary(*summary));
     }
+    launchers::emit(&ctx, &catalog);
 
     Ok(())
 }

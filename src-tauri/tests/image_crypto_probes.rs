@@ -100,7 +100,8 @@ async fn image_probe_reads_exif_fixture() {
     let gps = findings.iter().find(|f| f.kind == "gps").unwrap();
     assert_eq!(gps.status, FindingStatus::NotFound);
     assert!(findings.iter().any(|f| f.kind == "hashes"));
-    assert!(findings.iter().filter(|f| f.kind == "launcher").count() == 4);
+    assert!(findings.iter().filter(|f| f.kind == "launcher").count() >= 4, "reverse-image plus catalog tools");
+    assert!(findings.iter().any(|f| f.source == "TinEye"));
 }
 
 #[tokio::test]

@@ -12,9 +12,10 @@ import { ProbeView } from "./features/probes/ProbeView";
 import { CasesPage } from "./features/cases/CasesPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { ToolboxPage } from "./features/toolbox/ToolboxPage";
 import { GraphPage } from "./features/graph/GraphPage";
 
-const VIEW_KEYS: Record<string, View> = { "1": "probes", "2": "cases", "3": "graph", "4": "history", "5": "settings" };
+const VIEW_KEYS: Record<string, View> = { "1": "probes", "2": "cases", "3": "graph", "4": "history", "5": "toolbox", "6": "settings" };
 
 export default function App() {
   const settings = useStore((s) => s.settings);
@@ -97,6 +98,7 @@ export default function App() {
         {view === "cases" && <CasesPage />}
         {view === "history" && <HistoryPage />}
         {view === "settings" && <SettingsPage />}
+        {view === "toolbox" && <ToolboxPage />}
         {view === "graph" && <GraphPage />}
       </main>
       <Inspector />

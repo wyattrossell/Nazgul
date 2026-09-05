@@ -10,6 +10,7 @@ import type {
   EntityType,
   Finding,
   Graph,
+  Launcher,
   Note,
   PluginList,
   RouteStatus,
@@ -63,6 +64,8 @@ export const api = {
   deleteSecret: (name: string) => invoke<void>("delete_secret", { name }),
   checkRoute: (proxy: string | null) => invoke<RouteStatus>("check_route", { proxy }),
   listPlugins: () => invoke<PluginList>("list_plugins"),
+  saveFlippedImage: (path: string) => invoke<string>("save_flipped_image", { path }),
+  launcherCatalog: () => invoke<Launcher[]>("launcher_catalog"),
 };
 
 export interface ScanListeners {

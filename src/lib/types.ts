@@ -1,4 +1,4 @@
-export type ProbeKind = "username" | "email" | "phone" | "domain" | "ip" | "image" | "crypto" | "plugin" | "person";
+export type ProbeKind = "username" | "email" | "phone" | "domain" | "ip" | "image" | "crypto" | "plugin" | "person" | "geo" | "org";
 
 export type EntityType =
   | "username"
@@ -10,7 +10,8 @@ export type EntityType =
   | "wallet"
   | "person"
   | "org"
-  | "url";
+  | "url"
+  | "location";
 
 export type FindingStatus = "found" | "notFound" | "ambiguous" | "error" | "info";
 
@@ -263,12 +264,28 @@ export const PROBES: ProbeMeta[] = [
     blurb: "Geo, ASN, reverse DNS, open ports, Tor and abuse checks.",
   },
   {
-    kind: "image",
-    label: "Image",
-    entity: "image",
-    placeholder: "path to an image, or pick a file",
+    kind: "geo",
+    label: "Location",
+    entity: "location",
+    placeholder: "40.7128, -74.0060  or  a place name / address",
     available: true,
-    blurb: "EXIF metadata, GPS, hashes, reverse-image launchers.",
+    blurb: "Geocodes the input and opens every map, satellite, aircraft, Wi-Fi and street-level tool at that point.",
+  },
+  {
+    kind: "org",
+    label: "Company",
+    entity: "org",
+    placeholder: "company or organisation name",
+    available: true,
+    blurb: "OpenCorporates search plus company registers, government spending, nonprofit and UK/EU directories.",
+  },
+  {
+    kind: "image",
+    label: "File",
+    entity: "image",
+    placeholder: "path to an image, PDF or Office file, or pick one",
+    available: true,
+    blurb: "EXIF, GPS, camera, PDF and Office metadata, hashes, reverse-image and metadata tools.",
   },
   {
     kind: "crypto",
@@ -299,4 +316,15 @@ export const ENTITY_PROBE: Partial<Record<EntityType, ProbeKind>> = {
   image: "image",
   wallet: "crypto",
   person: "person",
+  location: "geo",
+  org: "org",
 };
+
+export interface Launcher {
+  name: string;
+  category: string;
+  types: EntityType[];
+  url: string;
+  note: string;
+  paste: boolean;
+}

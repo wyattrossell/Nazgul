@@ -8,7 +8,8 @@ const items: { view: View; label: string; phase?: string }[] = [
   { view: "cases", label: "Cases", phase: "ctrl 2" },
   { view: "graph", label: "Graph", phase: "ctrl 3" },
   { view: "history", label: "History", phase: "ctrl 4" },
-  { view: "settings", label: "Settings", phase: "ctrl 5" },
+  { view: "toolbox", label: "Toolbox", phase: "ctrl 5" },
+  { view: "settings", label: "Settings", phase: "ctrl 6" },
 ];
 
 export function Rail() {

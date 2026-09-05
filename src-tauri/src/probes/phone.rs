@@ -7,8 +7,9 @@ use phonenumber::{country, Mode};
 use serde_json::json;
 
 use super::email::urlencode;
+use super::launchers;
 use super::payments;
-use super::{FindingStatus, ScanContext};
+use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::http::fetch;
 
 const COUNTRY_NAMES: &[(&str, &str)] = &[
@@ -50,7 +51,6 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
 
     // parsed, country, launchers x4, messaging x2 (+1 keyed NumVerify)
     let numverify = ctx.secret("numverify").map(str::to_string);
-    ctx.start(8 + payments::MANUAL_LAUNCHER_COUNT + if numverify.is_some() && !ctx.options.airgap { 1 } else { 0 });
 
     let valid = phonenumber::is_valid(&number);
     let e164 = number.format().mode(Mode::E164).to_string();
@@ -61,6 +61,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let country_code = number.country().code();
     let kind = format!("{:?}", number.number_type(&phonenumber::metadata::DATABASE));
     let digits: String = e164.chars().filter(|c| c.is_ascii_digit()).collect();
+    let catalog = launchers::plan(EntityType::Phone, &launchers::vars_phone(&e164, &national));
+    ctx.start(8 + catalog.len() + payments::MANUAL_LAUNCHER_COUNT + if numverify.is_some() && !ctx.options.airgap { 1 } else { 0 });
 
     ctx.emit(
         ctx.finding("libphonenumber", "number", "Parsed number")
@@ -111,6 +113,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     for f in payments::manual_launchers(&ctx, &e164, "phone number") {
         ctx.emit(f);
     }
+
+    launchers::emit(&ctx, &catalog);
 
     // Reverse-lookup launchers with several formats quoted.
     let query = format!("\"{e164}\" OR \"{international}\" OR \"{national}\"");

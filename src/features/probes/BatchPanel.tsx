@@ -11,10 +11,12 @@ const RE_DOMAIN = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/.*)?$/i;
 const RE_PHONE = /^\+?[\d\s().-]{7,}$/;
 const RE_CRYPTO = /^(0x[0-9a-fA-F]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-z0-9]{25,62}|[LM][a-km-zA-HJ-NP-Z1-9]{26,33}|ltc1[a-z0-9]{25,62})$/;
 const RE_PERSON = /^[a-z][a-z'.-]*(\s+[a-z][a-z'.-]*){1,3}$/i;
+const RE_COORDS = /^-?\d{1,2}(\.\d+)?\s*[NS]?\s*[,;/ ]\s*-?\d{1,3}(\.\d+)?\s*[EW]?$/i;
 
 export function detectProbe(line: string): ProbeKind {
   const s = line.trim();
   if (RE_EMAIL.test(s)) return "email";
+  if (RE_COORDS.test(s)) return "geo";
   if (RE_IPV4.test(s) || RE_IPV6.test(s)) return "ip";
   if (RE_CRYPTO.test(s)) return "crypto";
   if (RE_DOMAIN.test(s)) return "domain";
@@ -23,7 +25,7 @@ export function detectProbe(line: string): ProbeKind {
   return "username";
 }
 
-const FORCE: (ProbeKind | "auto")[] = ["auto", "username", "person", "email", "phone", "domain", "ip", "crypto"];
+const FORCE: (ProbeKind | "auto")[] = ["auto", "username", "person", "email", "phone", "domain", "ip", "crypto", "geo", "org"];
 
 export function BatchPanel({ onClose }: { onClose: () => void }) {
   const pushLog = useStore((s) => s.pushLog);

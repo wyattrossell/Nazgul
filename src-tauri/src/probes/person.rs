@@ -6,6 +6,7 @@ use std::sync::Arc;
 use serde_json::json;
 
 use super::email::urlencode;
+use super::launchers as catalog;
 use super::payments;
 use super::{EntityType, FindingStatus, ScanContext};
 
@@ -92,7 +93,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         ("Wikipedia", "reference", "Wikipedia", format!("https://en.wikipedia.org/w/index.php?search={enc}"), "Notable-person check".into()),
     ];
 
-    ctx.start(1 + launchers.len() + payments::handle_check_count(candidates.len()));
+    let extra = catalog::plan(EntityType::Person, &catalog::vars_person(&name));
+    ctx.start(1 + launchers.len() + extra.len() + payments::handle_check_count(candidates.len()));
 
     // Candidates finding: the top three become username entities for pivoting.
     let mut cand = ctx
@@ -125,6 +127,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         }
         ctx.emit(f);
     }
+
+    catalog::emit(&ctx, &extra);
 
     if ctx.cancelled() {
         return Ok(());

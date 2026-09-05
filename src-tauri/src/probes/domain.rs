@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use tokio::sync::Semaphore;
 
 use super::email::urlencode;
+use super::launchers;
 use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::dns;
 use crate::engine::http::{build_following_client, fetch};
@@ -197,7 +198,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
 
     // rdap + 8 record types + spf + dmarc + dkim + ct + wayback + http + favicon + 3 well-known + 5 launchers + brute summary
     let keyed = ["shodan", "hunter", "virustotal"].iter().filter(|k| ctx.secret(k).is_some()).count();
-    ctx.start(25 + keyed);
+    let catalog = launchers::plan(EntityType::Domain, &launchers::vars_domain(&domain));
+    ctx.start(25 + keyed + catalog.len());
     let mut subdomains: BTreeSet<String> = BTreeSet::new();
 
     // ------------------------------------------------------------------ RDAP
@@ -637,14 +639,14 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     }
 
     // ------------------------------------------------------------------ launchers
-    let launchers: &[(&str, &str, String, &str)] = &[
+    let pages: &[(&str, &str, String, &str)] = &[
         ("dorks", "Search engine dorks", format!("https://www.google.com/search?q={}", urlencode(&format!("site:{domain}"))), "site: dork on Google; filetype and mention dorks in raw data"),
         ("Shodan", "Shodan hostname search", format!("https://www.shodan.io/search?query=hostname%3A{domain}"), "Hosts Shodan associates with this domain"),
         ("Hunter.io", "Email pattern lookup", format!("https://hunter.io/search/{domain}"), "Email address format and known addresses (API key support later)"),
         ("VirusTotal", "VirusTotal domain report", format!("https://www.virustotal.com/gui/domain/{domain}"), "Reputation, passive DNS, related files"),
         ("urlscan.io", "urlscan.io history", format!("https://urlscan.io/search/#{domain}"), "Past scans, screenshots, redirects"),
     ];
-    for (source, title, url, summary) in launchers {
+    for (source, title, url, summary) in pages {
         let mut f = ctx.finding(source, "launcher", title).category("launchers").status(FindingStatus::Info).url(url.clone()).summary(*summary);
         if *source == "dorks" {
             f.data = json!({
@@ -656,6 +658,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         }
         ctx.emit(f);
     }
+
+    launchers::emit(&ctx, &catalog);
 
     // ------------------------------------------------------------------ DNS brute force
     let sem = Arc::new(Semaphore::new(20));

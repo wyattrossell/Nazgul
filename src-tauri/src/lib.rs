@@ -53,6 +53,8 @@ pub fn run() {
             commands::delete_secret,
             commands::check_route,
             commands::list_plugins,
+            commands::save_flipped_image,
+            commands::launcher_catalog,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -13,7 +13,9 @@ use serde_json::json;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
-use super::{Finding, FindingStatus, ScanContext, ScanOptions};
+use super::email::urlencode;
+use super::launchers;
+use super::{EntityType, Finding, FindingStatus, ScanContext, ScanOptions};
 use crate::engine::http::describe_error;
 
 static WMN_RAW: &str = include_str!("../../../data/sites/wmn-data.json");
@@ -180,7 +182,29 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     if sites.is_empty() {
         return Err("No sites match the selected categories.".to_string());
     }
-    ctx.start(sites.len());
+    let catalog = launchers::plan(EntityType::Username, &launchers::vars_username(&account));
+    ctx.start(sites.len() + catalog.len() + 1);
+
+    // Dorks and hand-operated tools first so they are visible while the fan-out runs.
+    let quoted = format!("\"{account}\"");
+    ctx.emit(
+        ctx.finding("dorks", "dorks", "Search engine dorks")
+            .category("launchers")
+            .status(FindingStatus::Info)
+            .url(format!("https://www.google.com/search?q={}", urlencode(&quoted)))
+            .summary("Quoted handle on Google; @mention, site-scoped and document dorks in raw data")
+            .data(serde_json::json!({
+                "exact": format!("https://www.google.com/search?q={}", urlencode(&quoted)),
+                "mention": format!("https://www.google.com/search?q={}", urlencode(&format!("\"@{account}\""))),
+                "social": format!("https://www.google.com/search?q={}", urlencode(&format!("{quoted} (site:twitter.com OR site:x.com OR site:instagram.com OR site:tiktok.com OR site:facebook.com OR site:reddit.com)"))),
+                "documents": format!("https://www.google.com/search?q={}", urlencode(&format!("{quoted} filetype:pdf OR filetype:xlsx OR filetype:docx OR filetype:txt"))),
+                "inurl": format!("https://www.google.com/search?q={}", urlencode(&format!("inurl:{account}"))),
+                "bing": format!("https://www.bing.com/search?q={}", urlencode(&quoted)),
+                "duckduckgo": format!("https://duckduckgo.com/?q={}", urlencode(&quoted)),
+                "yandex": format!("https://yandex.com/search/?text={}", urlencode(&quoted)),
+            })),
+    );
+    launchers::emit(&ctx, &catalog);
 
     let semaphore = Arc::new(Semaphore::new(ctx.options.concurrency.clamp(1, 100)));
     let mut tasks: JoinSet<()> = JoinSet::new();

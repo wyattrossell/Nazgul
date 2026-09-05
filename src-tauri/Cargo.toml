@@ -35,6 +35,9 @@ imagesize = "0.15"
 sha2 = "0.10"
 sha3 = "0.10"
 keyring = { version = "3", features = ["windows-native"] }
+lopdf = "0.36"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "tiff", "bmp", "gif"] }
 
 [profile.release]
 codegen-units = 1
