@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { listenToScans } from "./lib/api";
+import { api, errorText, listenToScans } from "./lib/api";
 import { drainQueue } from "./lib/scans";
 import { effectiveProxy, useStore, type View } from "./store";
 import { BootSplash } from "./components/BootSplash";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { TopBar } from "./components/TopBar";
 import { Rail } from "./components/Rail";
 import { Inspector } from "./components/Inspector";
@@ -80,6 +81,22 @@ export default function App() {
 
     void loadCases().then(loadEntities);
 
+    // Launch-time update check, unless the user is airgapped.
+    const { settings: current, setUpdate } = useStore.getState();
+    if (!current.airgap) {
+      window.setTimeout(() => {
+        api
+          .checkUpdate()
+          .then((info) => {
+            setUpdate(info);
+            if (info.available) pushLog("ok", `update available: v${info.version} (running v${info.current})`);
+            else if (info.error) pushLog("warn", `update check: ${info.error}`);
+            else pushLog("info", `v${info.current} is the latest release`);
+          })
+          .catch((err) => pushLog("warn", `update check failed: ${errorText(err)}`));
+      }, 2500);
+    }
+
     return () => {
       cancelled = true;
       dispose?.();
@@ -92,6 +109,7 @@ export default function App() {
     <div className="shell">
       {booting && <BootSplash route={routeLabel} onDone={finishBoot} />}
       <TopBar />
+      <UpdateBanner />
       <Rail />
       <main className="main">
         {view === "probes" && <ProbeView />}

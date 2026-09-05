@@ -90,6 +90,31 @@ token), Hacker News, Keybase proofs, Gravatar by handle, LeakCheck public breach
 urlscan.io and OTX passive DNS.
 - Concurrency and timeout sliders, jitter between requests, no redirects followed during detection.
 
+## Install and update
+
+Download `Nazgul_<version>_x64-setup.exe` from the latest GitHub release and run it. The
+installer is per-user (no admin prompt), adds a Start Menu entry and always places a **Nazgul**
+shortcut on the desktop.
+
+On every launch the app checks the latest release on GitHub. When a newer signed build exists a
+banner offers **Install and restart**; the download is verified against the public key baked
+into the app before the installer runs. Settings has a manual **Check for updates** button.
+Airgap mode skips the check. Releases must be publicly reachable for the updater to see them.
+
+Publishing a release (maintainer):
+
+```
+# bump "version" in package.json, src-tauri/tauri.conf.json and src-tauri/Cargo.toml, commit, then
+git tag v0.2.1
+git push origin main --tags
+```
+
+The `release` GitHub Actions workflow builds the signed installer, creates the release and
+uploads `latest.json` for the updater. It needs two repository secrets:
+`TAURI_SIGNING_PRIVATE_KEY` (contents of `~/.tauri/nazgul.key`) and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (empty if the key has none). Keep the private key safe;
+without it no future update can be signed.
+
 ## Run it
 
 Requirements: Node 18+, Rust with the MSVC toolchain (`rustup default stable-x86_64-pc-windows-msvc`),

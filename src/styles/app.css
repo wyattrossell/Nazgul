@@ -69,11 +69,31 @@ textarea {
   height: 100%;
   display: grid;
   grid-template-columns: var(--rail-w) 1fr var(--inspector-w);
-  grid-template-rows: var(--top-h) 1fr var(--log-h);
+  grid-template-rows: var(--top-h) auto 1fr var(--log-h);
   grid-template-areas:
     "top top top"
+    "update update update"
     "rail main inspector"
     "log log log";
+}
+
+.update-banner {
+  grid-area: update;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 1rem;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--accent);
+  font-size: var(--fs-sm);
+}
+
+.update-banner .spacer {
+  flex: 1;
+}
+
+.update-banner b {
+  color: var(--accent);
 }
 
 .topbar {

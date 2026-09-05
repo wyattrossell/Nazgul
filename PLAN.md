@@ -31,7 +31,7 @@
 
 - [x] Follow-up: API keys. Every key in Settings now carries a "Get a key" link and a free-tier note (21 services, only HIBP paid). New keyed integrations: GitHub token, GreyNoise, IPQualityScore (IP, email, phone), Pulsedive, AlienVault OTX, SecurityTrails, urlscan.io, Veriphone, Steam, YouTube, Etherscan, OpenCorporates. New keyless enrichments: GitHub profile + commit-author emails, Hacker News, Keybase proofs, Gravatar by handle, LeakCheck public breach summary, urlscan and OTX passive DNS. Skipped: BGPView (DNS does not resolve), Reddit about.json (serves HTML to non-browsers).
 
-Deferred: auto-update needs a signing key and a hosted update manifest, so it is documented but not wired.
+- [x] Follow-up: installer and auto-update. NSIS installer hook always creates a desktop shortcut; per-user install. Tauri updater plugin with a minisign keypair (private key in ~/.tauri/nazgul.key on Wyatt's machine, public key in tauri.conf.json), endpoint = latest GitHub release latest.json, launch-time check with an in-app banner and a manual button in Settings, signature-verified passive install then restart. GitHub Actions `release` workflow builds and publishes on `v*` tags with the key stored as repo secrets. Constraint: release assets must be publicly reachable (the repo was private at the time of writing).
 
 ---
 

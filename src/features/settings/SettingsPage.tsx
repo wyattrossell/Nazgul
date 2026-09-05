@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api, errorText } from "../../lib/api";
-import type { AppInfo, PluginList, RouteStatus, SecretStatus, SiteSummary } from "../../lib/types";
+import type { AppInfo, PluginList, RouteStatus, SecretStatus, SiteSummary, UpdateInfo } from "../../lib/types";
 import { effectiveProxy, useStore, type Skin } from "../../store";
 
 const skins: { id: Skin; label: string }[] = [
@@ -21,6 +21,22 @@ export function SettingsPage() {
   const [route, setRoute] = useState<RouteStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [plugins, setPlugins] = useState<PluginList | null>(null);
+  const [update, setUpdateLocal] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const setUpdate = useStore((s) => s.setUpdate);
+
+  const checkUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const info = await api.checkUpdate();
+      setUpdateLocal(info);
+      setUpdate(info);
+    } catch (e) {
+      setUpdateLocal({ available: false, current: info?.version ?? "?", version: null, notes: null, date: null, error: errorText(e) });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   const refreshSecrets = () => api.secretStatus().then(setSecrets).catch((e) => pushLog("bad", errorText(e)));
 
@@ -271,6 +287,26 @@ export function SettingsPage() {
         Disposable-domain list from the disposable-email-domains project. Phone metadata from libphonenumber. Geolocation
         from ip-api.com, ports from Shodan InternetDB, archives from the Wayback Machine, certificates from crt.sh.
       </p>
+
+      <h2>Updates</h2>
+      <div className="field">
+        <span className="label">version</span>
+        <div className="row">
+          <span className="mono">v{info?.version ?? "…"}</span>
+          <button type="button" className="btn sm" onClick={checkUpdate} disabled={checkingUpdate || settings.airgap}>
+            {checkingUpdate ? "Checking…" : "Check for updates"}
+          </button>
+          {update && (
+            <span className={`status ${update.available ? "found" : update.error ? "error" : "info"}`}>
+              {update.available ? `v${update.version} available` : update.error ? update.error : "up to date"}
+            </span>
+          )}
+        </div>
+        <span className="help">
+          Checked automatically on every launch against the latest GitHub release (github.com/wyattrossell/Nazgul). Builds
+          are signature-verified before they install. Airgap mode skips the check.
+        </span>
+      </div>
 
       <h2>About</h2>
       <p className="muted">

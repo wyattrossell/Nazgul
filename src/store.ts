@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { api, errorText } from "./lib/api";
-import type { Case, Entity, Finding, ProbeKind, ScanDone, ScanOptions, ScanRow, ScanStarted } from "./lib/types";
+import type { Case, Entity, Finding, ProbeKind, ScanDone, ScanOptions, ScanRow, ScanStarted, UpdateInfo } from "./lib/types";
 
 export interface QueuedScan {
   probe: ProbeKind;
@@ -150,6 +150,9 @@ interface State {
 
   log: LogLine[];
   pushLog: (level: LogLine["level"], text: string) => void;
+
+  update: UpdateInfo | null;
+  setUpdate: (info: UpdateInfo | null) => void;
 }
 
 function emptyScan(id: string, probe: ProbeKind, input: string, caseId: number, total: number): Scan {
@@ -352,6 +355,9 @@ export const useStore = create<State>((set, get) => ({
     return next;
   },
   clearQueue: () => set({ queue: [] }),
+
+  update: null,
+  setUpdate: (update) => set({ update }),
 
   log: [{ id: ++logCounter, at: Date.now(), level: "info", text: "nazgul ready" }],
   pushLog: (level, text) =>

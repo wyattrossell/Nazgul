@@ -322,6 +322,15 @@ export const ENTITY_PROBE: Partial<Record<EntityType, ProbeKind>> = {
   org: "org",
 };
 
+export interface UpdateInfo {
+  available: boolean;
+  current: string;
+  version: string | null;
+  notes: string | null;
+  date: string | null;
+  error: string | null;
+}
+
 export interface Launcher {
   name: string;
   category: string;

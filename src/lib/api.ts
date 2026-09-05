@@ -21,6 +21,7 @@ import type {
   ScanStarted,
   SecretStatus,
   SiteSummary,
+  UpdateInfo,
 } from "./types";
 
 export const api = {
@@ -66,6 +67,8 @@ export const api = {
   listPlugins: () => invoke<PluginList>("list_plugins"),
   saveFlippedImage: (path: string) => invoke<string>("save_flipped_image", { path }),
   launcherCatalog: () => invoke<Launcher[]>("launcher_catalog"),
+  checkUpdate: () => invoke<UpdateInfo>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
 };
 
 export interface ScanListeners {

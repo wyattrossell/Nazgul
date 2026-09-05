@@ -4,6 +4,7 @@ pub mod commands;
 pub mod db;
 pub mod engine;
 pub mod probes;
+pub mod update;
 
 use std::sync::Arc;
 
@@ -14,7 +15,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(engine::ScanRegistry::default())
+        .manage(update::PendingUpdate::default())
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -55,6 +58,8 @@ pub fn run() {
             commands::list_plugins,
             commands::save_flipped_image,
             commands::launcher_catalog,
+            update::check_update,
+            update::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
