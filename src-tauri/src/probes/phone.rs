@@ -62,7 +62,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let kind = format!("{:?}", number.number_type(&phonenumber::metadata::DATABASE));
     let digits: String = e164.chars().filter(|c| c.is_ascii_digit()).collect();
     let catalog = launchers::plan(EntityType::Phone, &launchers::vars_phone(&e164, &national));
-    ctx.start(8 + catalog.len() + payments::MANUAL_LAUNCHER_COUNT + if numverify.is_some() && !ctx.options.airgap { 1 } else { 0 });
+    let keyed = if ctx.options.airgap { 0 } else { usize::from(numverify.is_some()) + usize::from(ctx.secret("veriphone").is_some()) + usize::from(ctx.secret("ipqs").is_some()) };
+    ctx.start(8 + catalog.len() + payments::MANUAL_LAUNCHER_COUNT + keyed);
 
     ctx.emit(
         ctx.finding("libphonenumber", "number", "Parsed number")
@@ -162,6 +163,50 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
                         .data(v.clone());
                 } else {
                     f = f.error(v["error"]["info"].as_str().unwrap_or("NumVerify returned an unexpected response").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    if let (Some(key), false) = (ctx.secret("veriphone"), ctx.options.airgap) {
+        let mut f = ctx.finding("Veriphone", "carrier", "Veriphone carrier and type").category("number");
+        match fetch(ctx.client.get(format!("https://api.veriphone.io/v2/verify?phone={}&key={key}", urlencode(&e164)))).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: serde_json::Value = serde_json::from_str(&res.body).unwrap_or(serde_json::Value::Null);
+                if v["status"].as_str() == Some("success") {
+                    let s = |k: &str| v[k].as_str().unwrap_or("").to_string();
+                    f = f.status(if v["phone_valid"].as_bool().unwrap_or(false) { FindingStatus::Found } else { FindingStatus::NotFound })
+                        .summary([s("carrier"), s("phone_type"), s("phone_region"), s("country")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" · "))
+                        .data(v.clone());
+                } else {
+                    f = f.error(v["message"].as_str().unwrap_or("Veriphone request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    if let (Some(key), false) = (ctx.secret("ipqs"), ctx.options.airgap) {
+        let mut f = ctx.finding("IPQualityScore", "validation", "IPQS phone validation").category("number");
+        match fetch(ctx.client.get(format!("https://ipqualityscore.com/api/json/phone/{key}/{digits}"))).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: serde_json::Value = serde_json::from_str(&res.body).unwrap_or(serde_json::Value::Null);
+                if v["success"].as_bool().unwrap_or(false) {
+                    let flags: Vec<&str> = [("active", "active"), ("leaked", "in a leak"), ("risky", "risky"), ("VOIP", "VoIP"), ("prepaid", "prepaid"), ("do_not_call", "do-not-call list")].iter().filter(|(k, _)| v[*k].as_bool().unwrap_or(false)).map(|(_, l)| *l).collect();
+                    let mut g = f.status(if v["valid"].as_bool().unwrap_or(false) { FindingStatus::Found } else { FindingStatus::NotFound })
+                        .summary(format!("{} · {} · {}{}{}", v["carrier"].as_str().unwrap_or("carrier ?"), v["line_type"].as_str().unwrap_or("type ?"), [v["city"].as_str().unwrap_or(""), v["region"].as_str().unwrap_or("")].iter().filter(|x| !x.is_empty()).cloned().collect::<Vec<_>>().join(", "), v["name"].as_str().filter(|n| !n.is_empty() && *n != "N/A").map(|n| format!(" · name on record: {n}")).unwrap_or_default(), if flags.is_empty() { String::new() } else { format!(" · {}", flags.join(", ")) }))
+                        .data(v.clone());
+                    if let Some(n) = v["name"].as_str().filter(|n| !n.is_empty() && *n != "N/A") {
+                        g = g.discover(super::EntityType::Person, n, Some("IPQS subscriber name"));
+                    }
+                    f = g;
+                } else {
+                    f = f.error(v["message"].as_str().unwrap_or("IPQS request failed").to_string());
                 }
             }
         }

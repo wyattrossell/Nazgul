@@ -55,6 +55,39 @@ The probes emit the same launchers automatically as findings, so a scan already 
 - Airgap mode refuses every network probe. Phone and image parsing keep working.
 - Rotate the desktop browser user agent per scan, or pin your own.
 - API keys live in Windows Credential Manager, never in a file, and are never sent to the UI.
+
+## API keys
+
+Settings lists every supported service with a **Get a key** link to its sign-up or token page
+and its free-tier limit. All but one have a free tier. Probes use a key only when present and
+fall back to a launcher otherwise.
+
+| Service | Used by | Free tier |
+|---|---|---|
+| GitHub token | username cards, commit-author emails | 5,000 requests/hour |
+| Shodan | IP host details, domain DNS | free account credits |
+| Censys | IP services and certificates | 250 queries/month |
+| ipinfo.io | IP geolocation and ASN | 50,000/month |
+| AbuseIPDB | IP abuse reports | 1,000/day |
+| GreyNoise | IP scanner classification | community API |
+| IPQualityScore | IP fraud score, email and phone validation | 5,000/month |
+| Pulsedive | domain and IP threat risk | community tier |
+| AlienVault OTX | passive DNS (works keyless) | free |
+| SecurityTrails | subdomain inventory | 50/month |
+| urlscan.io | domain scan history (works keyless) | free |
+| VirusTotal | domain and IP verdicts | 500/day |
+| Hunter.io | domain email addresses | 25/month |
+| EmailRep | email reputation (works keyless) | key on request |
+| Have I Been Pwned | breaches and pastes | paid, about $4/month |
+| NumVerify, Veriphone | phone carrier and type | 100/month, 1,000/month |
+| Steam Web API | Steam profile card | free |
+| YouTube Data API | YouTube channel card | 10,000 units/day |
+| Etherscan | Ethereum balance and transactions | 5 calls/second |
+| OpenCorporates | company search quota | free for non-commercial use |
+
+Keyless enrichments that always run: GitHub profile and public commit emails (60/hour without a
+token), Hacker News, Keybase proofs, Gravatar by handle, LeakCheck public breach summary,
+urlscan.io and OTX passive DNS.
 - Concurrency and timeout sliders, jitter between requests, no redirects followed during detection.
 
 ## Run it

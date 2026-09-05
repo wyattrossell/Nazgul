@@ -1409,3 +1409,38 @@ select.input {
   max-width: 900px;
   margin-bottom: 0.8rem;
 }
+
+/* ---------- API key links ---------- */
+
+.linkish-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0.25rem 0.5rem 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.linkish-btn:hover {
+  text-shadow: var(--glow);
+}
+
+.chip.free {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.chip.paid {
+  border-color: var(--warn);
+  color: var(--warn);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}

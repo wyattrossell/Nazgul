@@ -264,20 +264,37 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
             }
         }
         Chain::Ethereum => {
-            let mut f = ctx.finding("BlockCypher", "balance", "Balance and activity").category("chain")
+            let source = if ctx.secret("etherscan").is_some() { "Etherscan" } else { "BlockCypher" };
+            let mut f = ctx.finding(source, "balance", "Balance and activity").category("chain")
                 .url(format!("https://etherscan.io/address/{addr}"));
-            match fetch(follower.get(format!("https://api.blockcypher.com/v1/eth/main/addrs/{}/balance", addr.trim_start_matches("0x")))).await {
+            let request = match ctx.secret("etherscan") {
+                Some(key) => follower.get(format!("https://api.etherscan.io/v2/api?chainid=1&module=account&action=balance&address={addr}&tag=latest&apikey={key}")),
+                None => follower.get(format!("https://api.blockcypher.com/v1/eth/main/addrs/{}/balance", addr.trim_start_matches("0x"))),
+            };
+            match fetch(request).await {
                 Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
                 Ok(res) => {
                     f.elapsed_ms = res.elapsed_ms;
                     f.http_status = Some(res.status);
                     let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
-                    if res.status == 200 && v["final_balance"].is_number() {
+                    if res.status == 200 && v["status"].as_str() == Some("1") && v["result"].is_string() {
+                        let wei: f64 = v["result"].as_str().and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                        let eth = wei / 1e18;
+                        let key = ctx.secret("etherscan").unwrap_or("");
+                        let txs = fetch(follower.get(format!("https://api.etherscan.io/v2/api?chainid=1&module=account&action=txlist&address={addr}&page=1&offset=25&sort=desc&apikey={key}"))).await.ok()
+                            .and_then(|r| serde_json::from_str::<Value>(&r.body).ok())
+                            .map(|t| t["result"].as_array().map(|a| a.len()).unwrap_or(0)).unwrap_or(0);
+                        f = f.status(if txs > 0 || eth > 0.0 { FindingStatus::Found } else { FindingStatus::NotFound })
+                            .summary(format!("{eth:.6} ETH balance · {}{txs} recent tx", if txs >= 25 { "25+ of " } else { "" }))
+                            .data(json!({ "balanceWei": v["result"], "eth": eth, "recentTxCount": txs }));
+                    } else if res.status == 200 && v["final_balance"].is_number() {
                         let txs = v["n_tx"].as_u64().unwrap_or(0);
                         let eth = v["final_balance"].as_f64().unwrap_or(0.0) / 1e18;
                         f = f.status(if txs > 0 { FindingStatus::Found } else { FindingStatus::NotFound })
                             .summary(format!("{eth:.6} ETH balance · {txs} tx"))
                             .data(v.clone());
+                    } else if v["message"].as_str() == Some("NOTOK") {
+                        f = f.error(v["result"].as_str().unwrap_or("Etherscan rejected the request").to_string());
                     } else {
                         f = f.status(FindingStatus::Ambiguous).detail(format!("HTTP {}: {}", res.status, v["error"].as_str().unwrap_or("")));
                     }

@@ -25,7 +25,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         .finding("OpenCorporates", "companies", "OpenCorporates matches")
         .category("company")
         .url(format!("https://opencorporates.com/companies?q={}", urlencode(&name)));
-    match fetch(client.get(format!("https://api.opencorporates.com/v0.4/companies/search?q={}&per_page=10", urlencode(&name)))).await {
+    let token = ctx.secret("opencorporates").map(|t| format!("&api_token={t}")).unwrap_or_default();
+    match fetch(client.get(format!("https://api.opencorporates.com/v0.4/companies/search?q={}&per_page=10{token}", urlencode(&name)))).await {
         Err((e, ms)) => {
             oc.elapsed_ms = ms;
             oc = oc.error(e);

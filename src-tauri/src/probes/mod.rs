@@ -7,6 +7,7 @@
 pub mod crypto;
 pub mod domain;
 pub mod email;
+pub mod enrich;
 pub mod geo;
 pub mod image;
 pub mod ip;

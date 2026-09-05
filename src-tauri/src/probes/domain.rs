@@ -197,7 +197,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let resolver = dns::resolver();
 
     // rdap + 8 record types + spf + dmarc + dkim + ct + wayback + http + favicon + 3 well-known + 5 launchers + brute summary
-    let keyed = ["shodan", "hunter", "virustotal"].iter().filter(|k| ctx.secret(k).is_some()).count();
+    let keyed = ["shodan", "hunter", "virustotal", "securitytrails", "pulsedive"].iter().filter(|k| ctx.secret(k).is_some()).count() + 2; // urlscan + OTX always run
     let catalog = launchers::plan(EntityType::Domain, &launchers::vars_domain(&domain));
     ctx.start(25 + keyed + catalog.len());
     let mut subdomains: BTreeSet<String> = BTreeSet::new();
@@ -632,6 +632,123 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
                         .data(json!({ "stats": stats, "categories": a["categories"], "reputation": a["reputation"], "registrar": a["registrar"], "creationDate": a["creation_date"], "popularityRanks": a["popularity_ranks"] }));
                 } else {
                     f = f.error(v["error"]["message"].as_str().unwrap_or("VirusTotal request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+
+    if let Some(key) = ctx.secret("securitytrails") {
+        let mut f = ctx.finding("SecurityTrails", "subdomains", "SecurityTrails subdomains").category("subdomains").url(format!("https://securitytrails.com/list/apex_domain/{domain}"));
+        match fetch(follower.get(format!("https://api.securitytrails.com/v1/domain/{domain}/subdomains?children_only=false&include_inactive=true")).header("APIKEY", key).header("Accept", "application/json")).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                if res.status == 200 {
+                    let subs: Vec<String> = v["subdomains"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(|s| format!("{s}.{domain}"))).collect()).unwrap_or_default();
+                    for sd in &subs { subdomains.insert(sd.clone()); }
+                    f = f.status(if subs.is_empty() { FindingStatus::NotFound } else { FindingStatus::Info })
+                        .summary(format!("{} subdomain(s) on record", subs.len()))
+                        .data(json!({ "count": v["subdomain_count"], "subdomains": subs.iter().take(1000).collect::<Vec<_>>() }));
+                } else {
+                    f = f.error(v["message"].as_str().unwrap_or("SecurityTrails request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    {
+        let mut f = ctx.finding("urlscan.io", "scans", "urlscan.io history").category("web").url(format!("https://urlscan.io/search/#{domain}"));
+        let mut req = follower.get(format!("https://urlscan.io/api/v1/search/?q=domain:{domain}&size=20"));
+        if let Some(key) = ctx.secret("urlscan") {
+            req = req.header("API-Key", key);
+        }
+        match fetch(req).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                let results = v["results"].as_array().cloned().unwrap_or_default();
+                if res.status == 200 {
+                    let mut ips: Vec<String> = results.iter().filter_map(|r| r["page"]["ip"].as_str().map(str::to_string)).collect();
+                    ips.sort();
+                    ips.dedup();
+                    let latest = results.first().and_then(|r| r["task"]["time"].as_str()).map(|t| t.chars().take(10).collect::<String>());
+                    f = f.status(if results.is_empty() { FindingStatus::NotFound } else { FindingStatus::Info })
+                        .summary(format!("{} scan(s) on record{}{}", v["total"].as_u64().unwrap_or(results.len() as u64), latest.map(|l| format!(" · latest {l}")).unwrap_or_default(), if ips.is_empty() { String::new() } else { format!(" · served from {}", ips.join(", ")) }))
+                        .data(json!({ "total": v["total"], "results": results.iter().map(|r| json!({ "url": r["page"]["url"], "ip": r["page"]["ip"], "time": r["task"]["time"], "result": r["result"] })).collect::<Vec<_>>() }));
+                    for ip in ips.iter().take(5) {
+                        f = f.discover(EntityType::Ip, ip.clone(), Some("urlscan observed IP"));
+                    }
+                } else if res.status == 429 {
+                    f = f.status(FindingStatus::Info).summary("urlscan rate limit reached; add a key in Settings");
+                } else {
+                    f = f.status(FindingStatus::Ambiguous).detail(format!("HTTP {}", res.status));
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    {
+        let mut f = ctx.finding("AlienVault OTX", "passive_dns", "Passive DNS").category("dns").url(format!("https://otx.alienvault.com/indicator/domain/{domain}"));
+        let mut req = follower.get(format!("https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns"));
+        if let Some(key) = ctx.secret("otx") {
+            req = req.header("X-OTX-API-KEY", key);
+        }
+        match fetch(req).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                let rows = v["passive_dns"].as_array().cloned().unwrap_or_default();
+                if res.status == 200 {
+                    let mut hosts = BTreeSet::new();
+                    let mut ips = BTreeSet::new();
+                    for r in &rows {
+                        if let Some(h) = r["hostname"].as_str() {
+                            let h = h.to_lowercase();
+                            if h == domain || h.ends_with(&format!(".{domain}")) {
+                                hosts.insert(h.clone());
+                                subdomains.insert(h);
+                            }
+                        }
+                        if let Some(a) = r["address"].as_str() {
+                            if a.parse::<std::net::IpAddr>().is_ok() {
+                                ips.insert(a.to_string());
+                            }
+                        }
+                    }
+                    f = f.status(if rows.is_empty() { FindingStatus::NotFound } else { FindingStatus::Info })
+                        .summary(format!("{} passive DNS record(s) · {} host name(s) · {} distinct IP(s)", rows.len(), hosts.len(), ips.len()))
+                        .data(json!({ "hostnames": hosts, "ips": ips, "records": rows.iter().take(300).cloned().collect::<Vec<_>>() }));
+                } else {
+                    f = f.status(FindingStatus::Ambiguous).detail(format!("HTTP {}", res.status));
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    if let Some(key) = ctx.secret("pulsedive") {
+        let mut f = ctx.finding("Pulsedive", "threat", "Pulsedive risk").category("web").url(format!("https://pulsedive.com/indicator/?ioc={domain}"));
+        match fetch(follower.get(format!("https://pulsedive.com/api/info.php?indicator={domain}&pretty=0&key={key}"))).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                if let Some(risk) = v["risk"].as_str() {
+                    let threats: Vec<String> = v["threats"].as_array().map(|a| a.iter().filter_map(|t| t["name"].as_str().map(str::to_string)).collect()).unwrap_or_default();
+                    f = f.status(if risk == "none" || risk == "unknown" { FindingStatus::NotFound } else { FindingStatus::Found })
+                        .summary(format!("risk {risk}{}", if threats.is_empty() { String::new() } else { format!(" · threats: {}", threats.join(", ")) }))
+                        .data(v.clone());
+                } else if v["error"].as_str() == Some("Indicator not found.") {
+                    f = f.status(FindingStatus::NotFound).summary("not in Pulsedive");
+                } else {
+                    f = f.error(v["error"].as_str().unwrap_or("Pulsedive request failed").to_string());
                 }
             }
         }

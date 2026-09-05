@@ -287,7 +287,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let payment_handles: Vec<String> = candidates.iter().take(4).cloned().collect();
     let catalog = launchers::plan(EntityType::Email, &launchers::vars_email(&email));
     ctx.start(
-        9 + CHECKS.len()
+        10 + CHECKS.len() + usize::from(ctx.secret("ipqs").is_some())
             + catalog.len()
             + payments::MANUAL_LAUNCHER_COUNT
             + payments::handle_check_count(payment_handles.len())
@@ -556,6 +556,51 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         }
     }
     ctx.emit(rep);
+
+    // LeakCheck public API: breach source names and exposed field types, no key needed.
+    let mut leak = ctx.finding("LeakCheck", "breach", "LeakCheck breaches").category("breach").url(format!("https://leakcheck.io/search?query={}", encode(&email)));
+    match fetch(ctx.client.get(format!("https://leakcheck.io/api/public?check={}", encode(&email)))).await {
+        Err((e, ms)) => { leak.elapsed_ms = ms; leak = leak.error(e); }
+        Ok(res) => {
+            leak.elapsed_ms = res.elapsed_ms;
+            leak.http_status = Some(res.status);
+            let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+            if v["success"].as_bool().unwrap_or(false) {
+                let found = v["found"].as_u64().unwrap_or(0);
+                let sources: Vec<String> = v["sources"].as_array().map(|a| a.iter().filter_map(|s| s["name"].as_str().map(|n| format!("{n}{}", s["date"].as_str().map(|d| format!(" ({d})")).unwrap_or_default()))).collect()).unwrap_or_default();
+                let fields: Vec<String> = v["fields"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                leak = leak.status(if found > 0 { FindingStatus::Found } else { FindingStatus::NotFound })
+                    .summary(if found == 0 { "no breach records".to_string() } else { format!("{found} record(s) · exposed fields: {} · sources: {}", fields.join(", "), sources.iter().take(6).cloned().collect::<Vec<_>>().join(", ")) })
+                    .data(v.clone());
+            } else if res.status == 429 {
+                leak = leak.status(FindingStatus::Info).summary("LeakCheck public rate limit reached; try again shortly");
+            } else {
+                leak = leak.status(FindingStatus::Ambiguous).detail(v["error"].as_str().unwrap_or("unexpected response").to_string());
+            }
+        }
+    }
+    ctx.emit(leak);
+
+    if let Some(key) = ctx.secret("ipqs") {
+        let mut f = ctx.finding("IPQualityScore", "validation", "IPQS email validation").category("reputation");
+        match fetch(ctx.client.get(format!("https://ipqualityscore.com/api/json/email/{key}/{}", encode(&email)))).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                if v["success"].as_bool().unwrap_or(false) {
+                    let flags: Vec<&str> = [("leaked", "in a leak"), ("disposable", "disposable"), ("recent_abuse", "recent abuse"), ("honeypot", "honeypot"), ("catch_all", "catch-all domain")].iter().filter(|(k, _)| v[*k].as_bool().unwrap_or(false)).map(|(_, l)| *l).collect();
+                    f = f.status(if v["valid"].as_bool().unwrap_or(false) { FindingStatus::Found } else { FindingStatus::NotFound })
+                        .summary(format!("{} · deliverability {} · fraud score {}{}{}", if v["valid"].as_bool().unwrap_or(false) { "valid mailbox" } else { "invalid" }, v["deliverability"].as_str().unwrap_or("?"), v["fraud_score"].as_u64().unwrap_or(0), v["first_seen"]["human"].as_str().map(|s| format!(" · first seen {s}")).unwrap_or_default(), if flags.is_empty() { String::new() } else { format!(" · {}", flags.join(", ")) }))
+                        .data(v.clone());
+                } else {
+                    f = f.error(v["message"].as_str().unwrap_or("IPQS request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
     launchers::emit(&ctx, &catalog);
 
     // Payment apps: launchers that prefill the address in the user's own apps, then public

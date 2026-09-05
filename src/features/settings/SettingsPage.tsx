@@ -203,13 +203,22 @@ export function SettingsPage() {
       <h2>API keys</h2>
       <p className="muted">
         Stored in Windows Credential Manager, never in a file. A probe uses a key only when one is present; without it the
-        probe still runs and offers a launcher link instead.
+        probe still runs and offers a launcher link instead. Every service below has a free tier except where marked paid.
+        Click <b>Get a key</b> to open the sign-up or token page.
+      </p>
+      <p className="muted">
+        {secrets.filter((s) => s.set).length} of {secrets.length} keys saved.
       </p>
       {secrets.map((s) => (
         <div key={s.name} className="field">
           <span className="label">
             {s.label}
             {s.set && <span className="status found"> · saved</span>}
+            <br />
+            <button type="button" className="linkish-btn" onClick={() => api.openUrl(s.url)} title={s.url}>
+              Get a key ↗
+            </button>
+            <span className={`chip static ${s.free.toLowerCase().startsWith("paid") ? "paid" : "free"}`}>{s.free}</span>
           </span>
           <div className="row">
             <input

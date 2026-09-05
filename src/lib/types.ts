@@ -71,6 +71,8 @@ export interface SecretStatus {
   name: string;
   label: string;
   description: string;
+  url: string;
+  free: string;
   set: boolean;
 }
 

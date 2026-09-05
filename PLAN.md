@@ -29,6 +29,8 @@
 
 - [x] Follow-up: class-notes sweep (NW3C CI133 / CI134 guides + Google module). Added a shared launcher catalog (data/launchers.json, ~80 tools) that every probe emits and a Toolbox view browses; a dork builder with the full operator set; Location probe (Nominatim + 16 geolocation tools); Company probe (OpenCorporates + registers); File probe now reads PDF and Office metadata and can save a flipped image copy; EmailRep reputation in the email probe; Reddit, Instagram, Facebook, people-search, records and reverse-phone tools wired into the matching probes. Not included on purpose: AI writing tools, Android emulators, Zotero/SingleFile/PDF Mage (workflow utilities), Grabify/IP Logger (tracking links), Hash Toolkit, Proton VPN / I2P (infrastructure, not lookups).
 
+- [x] Follow-up: API keys. Every key in Settings now carries a "Get a key" link and a free-tier note (21 services, only HIBP paid). New keyed integrations: GitHub token, GreyNoise, IPQualityScore (IP, email, phone), Pulsedive, AlienVault OTX, SecurityTrails, urlscan.io, Veriphone, Steam, YouTube, Etherscan, OpenCorporates. New keyless enrichments: GitHub profile + commit-author emails, Hacker News, Keybase proofs, Gravatar by handle, LeakCheck public breach summary, urlscan and OTX passive DNS. Skipped: BGPView (DNS does not resolve), Reddit about.json (serves HTML to non-browsers).
+
 Deferred: auto-update needs a signing key and a hosted update manifest, so it is documented but not wired.
 
 ---

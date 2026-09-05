@@ -54,8 +54,9 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let public = is_public(&ip);
 
     // classification, ptr, geo, internetdb, tor, rdap, 6 launchers, + one per keyed service
-    let keyed = ["shodan", "ipinfo", "abuseipdb", "virustotal"].iter().filter(|k| ctx.secret(k).is_some()).count()
-        + usize::from(ctx.secret("censys_id").is_some() && ctx.secret("censys_secret").is_some());
+    let keyed = ["shodan", "ipinfo", "abuseipdb", "virustotal", "greynoise", "pulsedive", "ipqs"].iter().filter(|k| ctx.secret(k).is_some()).count()
+        + usize::from(ctx.secret("censys_id").is_some() && ctx.secret("censys_secret").is_some())
+        + 1; // OTX passive DNS runs with or without a key
     let catalog = launchers::plan(EntityType::Ip, &launchers::vars_ip(&ip.to_string()));
     ctx.start(if public { 12 + keyed + catalog.len() } else { 2 });
 
@@ -348,6 +349,105 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
                         .data(json!({ "stats": stats, "asOwner": a["as_owner"], "country": a["country"], "reputation": a["reputation"], "tags": a["tags"] }));
                 } else {
                     f = f.error(v["error"]["message"].as_str().unwrap_or("VirusTotal request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+
+    if let Some(key) = ctx.secret("greynoise") {
+        let mut f = ctx.finding("GreyNoise", "scanner", "GreyNoise classification").category("exposure").url(format!("https://viz.greynoise.io/ip/{ip}"));
+        match fetch(follower.get(format!("https://api.greynoise.io/v3/community/{ip}")).header("key", key).header("Accept", "application/json")).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                match res.status {
+                    200 => {
+                        let noise = v["noise"].as_bool().unwrap_or(false);
+                        let riot = v["riot"].as_bool().unwrap_or(false);
+                        f = f.status(if noise || riot { FindingStatus::Found } else { FindingStatus::NotFound })
+                            .summary(format!("{}{}{} · {}", if noise { "internet scanner (noise)" } else { "not a known scanner" }, if riot { " · common business service (RIOT)" } else { "" }, v["classification"].as_str().map(|c| format!(" · {c}")).unwrap_or_default(), v["name"].as_str().unwrap_or("unnamed")))
+                            .data(v.clone());
+                    }
+                    404 => f = f.status(FindingStatus::NotFound).summary("GreyNoise has not observed this IP"),
+                    401 => f = f.error("GreyNoise rejected the API key"),
+                    429 => f = f.error("GreyNoise community quota reached"),
+                    other => f = f.status(FindingStatus::Ambiguous).detail(format!("HTTP {other}")),
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    if let Some(key) = ctx.secret("ipqs") {
+        let mut f = ctx.finding("IPQualityScore", "fraud", "IPQS fraud score").category("exposure");
+        match fetch(follower.get(format!("https://ipqualityscore.com/api/json/ip/{key}/{ip}?strictness=1&allow_public_access_points=true"))).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                if v["success"].as_bool().unwrap_or(false) {
+                    let score = v["fraud_score"].as_u64().unwrap_or(0);
+                    let flags: Vec<&str> = [("proxy", "proxy"), ("vpn", "VPN"), ("tor", "Tor"), ("bot_status", "bot"), ("recent_abuse", "recent abuse"), ("is_crawler", "crawler")].iter().filter(|(k, _)| v[*k].as_bool().unwrap_or(false)).map(|(_, l)| *l).collect();
+                    f = f.status(if score >= 75 || !flags.is_empty() { FindingStatus::Found } else { FindingStatus::NotFound })
+                        .summary(format!("fraud score {score}/100 · {} · {}{}", v["ISP"].as_str().unwrap_or("?"), v["connection_type"].as_str().unwrap_or("?"), if flags.is_empty() { String::new() } else { format!(" · {}", flags.join(", ")) }))
+                        .data(v.clone());
+                } else {
+                    f = f.error(v["message"].as_str().unwrap_or("IPQS request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    if let Some(key) = ctx.secret("pulsedive") {
+        let mut f = ctx.finding("Pulsedive", "threat", "Pulsedive risk").category("exposure").url(format!("https://pulsedive.com/indicator/?ioc={ip}"));
+        match fetch(follower.get(format!("https://pulsedive.com/api/info.php?indicator={ip}&pretty=0&key={key}"))).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                if let Some(risk) = v["risk"].as_str() {
+                    let threats: Vec<String> = v["threats"].as_array().map(|a| a.iter().filter_map(|t| t["name"].as_str().map(str::to_string)).collect()).unwrap_or_default();
+                    f = f.status(if risk == "none" || risk == "unknown" { FindingStatus::NotFound } else { FindingStatus::Found })
+                        .summary(format!("risk {risk}{}", if threats.is_empty() { String::new() } else { format!(" · threats: {}", threats.join(", ")) }))
+                        .data(v.clone());
+                } else if v["error"].as_str() == Some("Indicator not found.") {
+                    f = f.status(FindingStatus::NotFound).summary("not in Pulsedive");
+                } else {
+                    f = f.error(v["error"].as_str().unwrap_or("Pulsedive request failed").to_string());
+                }
+            }
+        }
+        ctx.emit(f);
+    }
+    {
+        let mut f = ctx.finding("AlienVault OTX", "passive_dns", "Passive DNS").category("dns").url(format!("https://otx.alienvault.com/indicator/ip/{ip}"));
+        let mut req = follower.get(format!("https://otx.alienvault.com/api/v1/indicators/IPv4/{ip}/passive_dns"));
+        if let Some(key) = ctx.secret("otx") {
+            req = req.header("X-OTX-API-KEY", key);
+        }
+        match fetch(req).await {
+            Err((e, ms)) => { f.elapsed_ms = ms; f = f.error(e); }
+            Ok(res) => {
+                f.elapsed_ms = res.elapsed_ms;
+                f.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                let rows = v["passive_dns"].as_array().cloned().unwrap_or_default();
+                if res.status == 200 {
+                    let mut hosts: Vec<String> = rows.iter().filter_map(|r| r["hostname"].as_str().map(str::to_string)).collect();
+                    hosts.sort();
+                    hosts.dedup();
+                    f = f.status(if hosts.is_empty() { FindingStatus::NotFound } else { FindingStatus::Found })
+                        .summary(format!("{} host name(s) historically resolved here{}", hosts.len(), if hosts.is_empty() { String::new() } else { format!(": {}", hosts.iter().take(8).cloned().collect::<Vec<_>>().join(", ")) }))
+                        .data(json!({ "hostnames": hosts, "records": rows.iter().take(200).cloned().collect::<Vec<_>>() }));
+                    for h in hosts.iter().take(15) {
+                        f = f.discover(EntityType::Domain, registrable(h), Some("OTX passive DNS"));
+                    }
+                } else {
+                    f = f.status(FindingStatus::Ambiguous).detail(format!("HTTP {}", res.status));
                 }
             }
         }

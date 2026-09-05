@@ -14,6 +14,7 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use super::email::urlencode;
+use super::enrich;
 use super::launchers;
 use super::{EntityType, Finding, FindingStatus, ScanContext, ScanOptions};
 use crate::engine::http::describe_error;
@@ -183,7 +184,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         return Err("No sites match the selected categories.".to_string());
     }
     let catalog = launchers::plan(EntityType::Username, &launchers::vars_username(&account));
-    ctx.start(sites.len() + catalog.len() + 1);
+    ctx.start(sites.len() + catalog.len() + 1 + enrich::card_count(&ctx));
 
     // Dorks and hand-operated tools first so they are visible while the fan-out runs.
     let quoted = format!("\"{account}\"");
@@ -234,5 +235,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     }
 
     while tasks.join_next().await.is_some() {}
+
+    // Profile cards from sites with public APIs: bios, links, emails, names to pivot on.
+    enrich::username_cards(&ctx, &account).await;
     Ok(())
 }
