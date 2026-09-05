@@ -1,0 +1,10 @@
+{
+  "name": "holehe",
+  "description": "holehe email registration checks (pip install holehe). Lines with [+] are registered accounts.",
+  "inputTypes": ["email"],
+  "command": "holehe",
+  "args": ["{input}", "--only-used", "--no-color", "--no-clear"],
+  "parse": "lines",
+  "foundMarker": "[+]",
+  "timeoutSecs": 600
+}

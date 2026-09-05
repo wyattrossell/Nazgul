@@ -1,0 +1,10 @@
+{
+  "name": "theHarvester",
+  "description": "theHarvester domain reconnaissance (pip install theHarvester). Output lines are kept as-is.",
+  "inputTypes": ["domain"],
+  "command": "theHarvester",
+  "args": ["-d", "{input}", "-b", "crtsh,hackertarget,otx,urlscan"],
+  "parse": "lines",
+  "foundMarker": "@",
+  "timeoutSecs": 900
+}

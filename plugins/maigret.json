@@ -1,0 +1,10 @@
+{
+  "name": "maigret",
+  "description": "Maigret username search with profile parsing (pip install maigret). Lines with [+] are hits.",
+  "inputTypes": ["username"],
+  "command": "maigret",
+  "args": ["{input}", "--no-color", "--no-progressbar", "--timeout", "20"],
+  "parse": "lines",
+  "foundMarker": "[+]",
+  "timeoutSecs": 900
+}

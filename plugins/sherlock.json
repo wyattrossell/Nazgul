@@ -1,0 +1,10 @@
+{
+  "name": "sherlock",
+  "description": "Sherlock username search (pip install sherlock-project). Lines with [+] are hits.",
+  "inputTypes": ["username"],
+  "command": "sherlock",
+  "args": ["{input}", "--print-found", "--no-color", "--timeout", "20"],
+  "parse": "lines",
+  "foundMarker": "[+]",
+  "timeoutSecs": 600
+}

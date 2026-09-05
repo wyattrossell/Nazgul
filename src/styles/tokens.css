@@ -1,0 +1,74 @@
+/* Nazgul design tokens. Skins are selected with data-skin on <html>. */
+
+:root {
+  /* PHOSPHOR: the default. Green on near-black. */
+  --bg: #0a0e0b;
+  --panel: #0f1511;
+  --panel-2: #141c17;
+  --line: #1f3324;
+  --line-strong: #2d4a35;
+  --ink: #b9f0c4;
+  --ink-2: #6f9c7a;
+  --ink-3: #4a6b53;
+  --accent: #3dff6f;
+  --accent-ink: #061009;
+  --warn: #ffb000;
+  --bad: #ff6b6b;
+  --glow: 0 0 6px rgba(61, 255, 111, 0.35);
+  --scan: 0;
+
+  --mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 26px;
+
+  --rail-w: 176px;
+  --inspector-w: 320px;
+  --top-h: 36px;
+  --log-h: 116px;
+}
+
+:root[data-skin="amber"] {
+  --bg: #110c03;
+  --panel: #17110a;
+  --panel-2: #1f170c;
+  --line: #3a2a0c;
+  --line-strong: #5a4116;
+  --ink: #f3d9a4;
+  --ink-2: #a88a55;
+  --ink-3: #6e5a38;
+  --accent: #ffb000;
+  --accent-ink: #1a1000;
+  --warn: #ff6a3d;
+  --bad: #ff5c5c;
+  --glow: 0 0 6px rgba(255, 176, 0, 0.35);
+}
+
+:root[data-skin="paper"] {
+  --bg: #f1ecdf;
+  --panel: #f8f4ea;
+  --panel-2: #ece6d6;
+  --line: #cfc6b2;
+  --line-strong: #b3a88f;
+  --ink: #1d1a13;
+  --ink-2: #5d574a;
+  --ink-3: #8d8676;
+  --accent: #0c6b3d;
+  --accent-ink: #f1ecdf;
+  --warn: #9a5b00;
+  --bad: #b3261e;
+  --glow: none;
+}
+
+:root[data-crt="on"] {
+  --scan: 1;
+}
+
+:root[data-skin="paper"][data-crt="on"] {
+  /* CRT texture is a dark-screen effect. Paper stays clean. */
+  --scan: 0;
+}
