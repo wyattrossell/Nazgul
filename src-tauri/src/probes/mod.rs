@@ -12,11 +12,13 @@ pub mod geo;
 pub mod image;
 pub mod ip;
 pub mod launchers;
+pub mod netintel;
 pub mod org;
 pub mod payments;
 pub mod person;
 pub mod phone;
 pub mod plugin;
+pub mod records;
 pub mod username;
 
 use std::collections::HashMap;

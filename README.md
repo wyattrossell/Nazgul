@@ -84,10 +84,29 @@ fall back to a launcher otherwise.
 | YouTube Data API | YouTube channel card | 10,000 units/day |
 | Etherscan | Ethereum balance and transactions | 5 calls/second |
 | OpenCorporates | company search quota | free for non-commercial use |
+| abuse.ch auth key | URLhaus malware URLs, ThreatFox indicators, MalwareBazaar file hashes | free |
+| FullHunt | attack-surface subdomains | free tier |
+| OpenSanctions | sanctions, PEP and crime-list screening for names and companies | free, non-commercial |
+| Companies House | UK company and officer search | free |
+| FEC | campaign-contribution quota beyond the shared DEMO_KEY | free |
+| CourtListener | court search quota (works keyless) | free |
 
-Keyless enrichments that always run: GitHub profile and public commit emails (60/hour without a
-token), Hacker News, Keybase proofs, Gravatar by handle, LeakCheck public breach summary,
-urlscan.io and OTX passive DNS.
+Keyless lookups that always run, most of them found through the public-apis list:
+
+- **Username cards:** GitHub profile and public commit emails, Hacker News, Keybase proofs,
+  Gravatar, GitLab, Mastodon (mastodon.social), Bluesky, Lichess, Chess.com, Docker Hub,
+  Stack Overflow, crates.io. Names, locations, companies, websites and bios become pivots.
+- **Name probe records:** Wikidata and Wikipedia summary, FBI Wanted, CourtListener opinions,
+  NPI healthcare-provider registry, FEC campaign contributions (employer, occupation, city),
+  surname-origin estimate.
+- **Company probe records:** Wikidata, ProPublica Nonprofit Explorer, FEC donors listing the
+  employer, NPI organisations.
+- **Domain:** HackerTarget host search, Cert Spotter certificate issuances, MDN HTTP Observatory
+  security-header grade, urlscan.io history, OTX passive DNS.
+- **IP:** ipwho.is second geolocation source, HackerTarget reverse IP, OTX passive DNS.
+- **Email:** LeakCheck breach summary, Kickbox disposable check, EmailRep reputation.
+- **Location:** Wikipedia places within 2 km, live aircraft overhead from OpenSky.
+- **Toolbox:** MAC address vendor lookup.
 - Concurrency and timeout sliders, jitter between requests, no redirects followed during detection.
 
 ## Install and update

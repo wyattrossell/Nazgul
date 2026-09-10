@@ -8,6 +8,7 @@ use serde_json::json;
 use super::email::urlencode;
 use super::launchers as catalog;
 use super::payments;
+use super::records;
 use super::{EntityType, FindingStatus, ScanContext};
 
 fn clean_token(t: &str) -> String {
@@ -94,7 +95,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     ];
 
     let extra = catalog::plan(EntityType::Person, &catalog::vars_person(&name));
-    ctx.start(1 + launchers.len() + extra.len() + payments::handle_check_count(candidates.len()));
+    ctx.start(1 + launchers.len() + extra.len() + records::person_count(&ctx) + payments::handle_check_count(candidates.len()));
 
     // Candidates finding: the top three become username entities for pivoting.
     let mut cand = ctx
@@ -129,6 +130,12 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     }
 
     catalog::emit(&ctx, &extra);
+
+    if ctx.cancelled() {
+        return Ok(());
+    }
+    // Public records: Wikidata, FBI Wanted, CourtListener, NPI, FEC, surname origin (+ keyed screening).
+    records::person_records(&ctx, &name).await;
 
     if ctx.cancelled() {
         return Ok(());

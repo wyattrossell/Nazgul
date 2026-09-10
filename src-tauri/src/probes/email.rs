@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 
 use super::launchers;
+use super::netintel;
 use super::payments;
 use super::{EntityType, Finding, FindingStatus, ScanContext};
 use crate::engine::dns;
@@ -287,7 +288,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let payment_handles: Vec<String> = candidates.iter().take(4).cloned().collect();
     let catalog = launchers::plan(EntityType::Email, &launchers::vars_email(&email));
     ctx.start(
-        10 + CHECKS.len() + usize::from(ctx.secret("ipqs").is_some())
+        11 + CHECKS.len() + usize::from(ctx.secret("ipqs").is_some())
             + catalog.len()
             + payments::MANUAL_LAUNCHER_COUNT
             + payments::handle_check_count(payment_handles.len())
@@ -322,6 +323,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
             })
             .category("posture"),
     );
+
+    ctx.emit(netintel::kickbox_disposable(&ctx, &email).await);
 
     if ctx.cancelled() {
         return Ok(());

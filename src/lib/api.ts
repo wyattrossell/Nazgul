@@ -67,6 +67,7 @@ export const api = {
   listPlugins: () => invoke<PluginList>("list_plugins"),
   saveFlippedImage: (path: string) => invoke<string>("save_flipped_image", { path }),
   launcherCatalog: () => invoke<Launcher[]>("launcher_catalog"),
+  macVendor: (mac: string) => invoke<string>("mac_vendor", { mac }),
   checkUpdate: () => invoke<UpdateInfo>("check_update"),
   installUpdate: () => invoke<void>("install_update"),
 };

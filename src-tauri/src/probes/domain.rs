@@ -16,6 +16,7 @@ use tokio::sync::Semaphore;
 
 use super::email::urlencode;
 use super::launchers;
+use super::netintel;
 use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::dns;
 use crate::engine::http::{build_following_client, fetch};
@@ -197,7 +198,9 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let resolver = dns::resolver();
 
     // rdap + 8 record types + spf + dmarc + dkim + ct + wayback + http + favicon + 3 well-known + 5 launchers + brute summary
-    let keyed = ["shodan", "hunter", "virustotal", "securitytrails", "pulsedive"].iter().filter(|k| ctx.secret(k).is_some()).count() + 2; // urlscan + OTX always run
+    let keyed = ["shodan", "hunter", "virustotal", "securitytrails", "pulsedive", "fullhunt", "abusech"].iter().filter(|k| ctx.secret(k).is_some()).count()
+        + usize::from(ctx.secret("abusech").is_some()) // ThreatFox rides on the same key
+        + 5; // urlscan, OTX, HackerTarget, Cert Spotter, Observatory always run
     let catalog = launchers::plan(EntityType::Domain, &launchers::vars_domain(&domain));
     ctx.start(25 + keyed + catalog.len());
     let mut subdomains: BTreeSet<String> = BTreeSet::new();
@@ -557,6 +560,26 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
 
     if ctx.cancelled() {
         return Ok(());
+    }
+
+    // ------------------------------------------------------------------ free network intel
+    {
+        let (f, hosts) = netintel::hackertarget_hosts(&ctx, &domain).await;
+        subdomains.extend(hosts);
+        ctx.emit(f);
+        let (f, hosts) = netintel::certspotter(&ctx, &domain).await;
+        subdomains.extend(hosts);
+        ctx.emit(f);
+        ctx.emit(netintel::observatory(&ctx, &domain).await);
+    }
+    if let Some(key) = ctx.secret("fullhunt") {
+        let (f, hosts) = netintel::fullhunt(&ctx, &domain, key).await;
+        subdomains.extend(hosts);
+        ctx.emit(f);
+    }
+    if let Some(key) = ctx.secret("abusech") {
+        ctx.emit(netintel::urlhaus_host(&ctx, &domain, key).await);
+        ctx.emit(netintel::threatfox(&ctx, &domain, key).await);
     }
 
     // ------------------------------------------------------------------ keyed services

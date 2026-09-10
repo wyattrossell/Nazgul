@@ -67,8 +67,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
 
     let mut point = parse_coordinates(&input);
     let mut planned = point.map(|(lat, lon)| launchers::plan(EntityType::Location, &launchers::vars_location(lat, lon)));
-    // geocode/reverse (1) + launchers (unknown until geocoded: assume the catalog size)
-    ctx.start(1 + planned.as_ref().map(|p| p.len()).unwrap_or_else(|| launchers::for_type(EntityType::Location).len()));
+    // geocode/reverse (1) + nearby places + aircraft overhead + launchers
+    ctx.start(3 + planned.as_ref().map(|p| p.len()).unwrap_or_else(|| launchers::for_type(EntityType::Location).len()));
 
     match point {
         Some((lat, lon)) => {
@@ -128,9 +128,48 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         }
     }
 
+    if let Some((lat, lon)) = point {
+        // Nearby notable places (Wikipedia) and live aircraft overhead (OpenSky).
+        let mut near = ctx.finding("Wikipedia", "nearby", "Nearby notable places").category("geo")
+            .url(format!("https://en.wikipedia.org/wiki/Special:Nearby#/coord/{lat},{lon}"));
+        match fetch(client.get(format!("https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord={lat}%7C{lon}&gsradius=2000&gslimit=10&format=json")).header("User-Agent", NOMINATIM_UA)).await {
+            Err((e, ms)) => { near.elapsed_ms = ms; near = near.error(e); }
+            Ok(res) => {
+                near.elapsed_ms = res.elapsed_ms;
+                near.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                let places: Vec<Value> = v["query"]["geosearch"].as_array().cloned().unwrap_or_default();
+                let names: Vec<String> = places.iter().map(|p| format!("{} ({:.0} m)", p["title"].as_str().unwrap_or("?"), p["dist"].as_f64().unwrap_or(0.0))).collect();
+                near = near.status(if places.is_empty() { FindingStatus::NotFound } else { FindingStatus::Info })
+                    .summary(if names.is_empty() { "no Wikipedia-listed places within 2 km".to_string() } else { format!("within 2 km: {}", names.join(", ")) })
+                    .data(json!({ "places": places.iter().map(|p| json!({ "title": p["title"], "distanceM": p["dist"], "lat": p["lat"], "lon": p["lon"], "url": format!("https://en.wikipedia.org/?curid={}", p["pageid"]) })).collect::<Vec<_>>() }));
+            }
+        }
+        ctx.emit(near);
+
+        let (lamin, lamax, lomin, lomax) = (lat - 0.25, lat + 0.25, lon - 0.35, lon + 0.35);
+        let mut air = ctx.finding("OpenSky Network", "aircraft", "Aircraft overhead right now").category("geo")
+            .url(format!("https://globe.adsbexchange.com/?lat={lat}&lon={lon}&zoom=9"));
+        match fetch(client.get(format!("https://opensky-network.org/api/states/all?lamin={lamin}&lomin={lomin}&lamax={lamax}&lomax={lomax}")).header("User-Agent", NOMINATIM_UA)).await {
+            Err((e, ms)) => { air.elapsed_ms = ms; air = air.error(e); }
+            Ok(res) => {
+                air.elapsed_ms = res.elapsed_ms;
+                air.http_status = Some(res.status);
+                let v: Value = serde_json::from_str(&res.body).unwrap_or(Value::Null);
+                let states: Vec<Value> = v["states"].as_array().cloned().unwrap_or_default();
+                let rows: Vec<Value> = states.iter().map(|s| json!({
+                    "icao24": s[0], "callsign": s[1].as_str().map(str::trim), "country": s[2], "lon": s[5], "lat": s[6], "altitudeM": s[7], "onGround": s[8], "velocityMs": s[9], "heading": s[10]
+                })).collect();
+                let calls: Vec<String> = rows.iter().filter_map(|r| r["callsign"].as_str().map(str::to_string)).filter(|c| !c.is_empty()).take(8).collect();
+                air = air.status(if res.status == 200 { FindingStatus::Info } else { FindingStatus::Ambiguous })
+                    .summary(if res.status != 200 { format!("OpenSky answered HTTP {} (anonymous quota is small)", res.status) } else if rows.is_empty() { "no ADS-B aircraft in a ~50 km box at this moment".to_string() } else { format!("{} aircraft in a ~50 km box: {}", rows.len(), calls.join(", ")) })
+                    .data(json!({ "time": v["time"], "box": { "lamin": lamin, "lamax": lamax, "lomin": lomin, "lomax": lomax }, "aircraft": rows }));
+            }
+        }
+        ctx.emit(air);
+    }
     if let Some(p) = planned {
         launchers::emit(&ctx, &p);
     }
-    let _ = point;
     Ok(())
 }

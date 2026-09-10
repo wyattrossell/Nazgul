@@ -26,6 +26,17 @@ export function ToolboxPage() {
   const [value, setValue] = useState("");
   const [dork, setDork] = useState<DorkSpec>(EMPTY_DORK);
   const [showSheet, setShowSheet] = useState(false);
+  const [mac, setMac] = useState("");
+  const [macResult, setMacResult] = useState<string | null>(null);
+
+  const lookupMac = async () => {
+    setMacResult("…");
+    try {
+      setMacResult(await api.macVendor(mac));
+    } catch (e) {
+      setMacResult(errorText(e));
+    }
+  };
 
   useEffect(() => {
     api
@@ -120,6 +131,25 @@ export function ToolboxPage() {
           </div>
         ))
       )}
+
+      <h2>Quick lookups</h2>
+      <div className="search-row" style={{ maxWidth: 700 }}>
+        <input
+          className="input"
+          value={mac}
+          onChange={(e) => setMac(e.target.value)}
+          placeholder="MAC address or OUI prefix, e.g. 00:1A:2B:3C:4D:5E"
+          spellCheck={false}
+          aria-label="MAC address"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && mac.trim()) void lookupMac();
+          }}
+        />
+        <button type="button" className="btn" disabled={!mac.trim()} onClick={lookupMac}>
+          Vendor
+        </button>
+        {macResult && <span className="mono muted">{macResult}</span>}
+      </div>
 
       <h2>Dork builder</h2>
       <div className="dork-grid">

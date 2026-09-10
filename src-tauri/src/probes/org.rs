@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 
 use super::email::urlencode;
 use super::launchers;
+use super::records;
 use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::http::{build_following_client, fetch};
 
@@ -18,7 +19,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let client = build_following_client(&ctx.options.http_options()).map_err(|e| e.to_string())?;
     let vars = launchers::vars_org(&name);
     let planned = launchers::plan(EntityType::Org, &vars);
-    ctx.start(2 + planned.len());
+    ctx.start(2 + planned.len() + records::org_count(&ctx));
 
     // OpenCorporates public search (works unauthenticated at low volume; degrades gracefully).
     let mut oc = ctx
@@ -79,5 +80,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     );
 
     launchers::emit(&ctx, &planned);
+    // Public records: Wikidata, ProPublica nonprofits, FEC donors by employer, NPI organisations (+ keyed screening).
+    records::org_records(&ctx, &name).await;
     Ok(())
 }

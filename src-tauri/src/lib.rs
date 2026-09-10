@@ -58,6 +58,7 @@ pub fn run() {
             commands::list_plugins,
             commands::save_flipped_image,
             commands::launcher_catalog,
+            commands::mac_vendor,
             update::check_update,
             update::install_update,
         ])

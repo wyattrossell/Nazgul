@@ -291,6 +291,22 @@ pub fn save_flipped_image(path: String) -> Result<String, String> {
     probes::image::save_flipped(std::path::Path::new(&path))
 }
 
+/// MAC address or OUI prefix to vendor name (macvendors.com, no key).
+#[tauri::command]
+pub async fn mac_vendor(mac: String) -> Result<String, String> {
+    let cleaned: String = mac.trim().chars().filter(|c| c.is_ascii_hexdigit() || *c == ':' || *c == '-').collect();
+    if cleaned.chars().filter(|c| c.is_ascii_hexdigit()).count() < 6 {
+        return Err("Enter at least the first six hex digits of a MAC address.".to_string());
+    }
+    let client = build_following_client(&HttpOptions::default()).map_err(|e| e.to_string())?;
+    match fetch(client.get(format!("https://api.macvendors.com/{cleaned}")).header("User-Agent", "nazgul-osint")).await {
+        Err((e, _)) => Err(e),
+        Ok(res) if res.status == 200 => Ok(res.body.trim().to_string()),
+        Ok(res) if res.status == 404 => Ok("no vendor registered for this prefix".to_string()),
+        Ok(res) => Err(format!("HTTP {}", res.status)),
+    }
+}
+
 #[tauri::command]
 pub fn launcher_catalog() -> Vec<probes::launchers::Launcher> {
     probes::launchers::CATALOG.clone()

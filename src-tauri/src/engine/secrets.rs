@@ -30,6 +30,12 @@ pub const KEYS: &[(&str, &str, &str, &str, &str)] = &[
     ("youtube", "YouTube Data API", "Channel card for a handle (subscribers, country, description links)", "https://console.cloud.google.com/apis/library/youtube.googleapis.com", "Free · 10,000 units/day"),
     ("etherscan", "Etherscan", "Ethereum balance and transaction history", "https://etherscan.io/register", "Free · 5 calls/second"),
     ("opencorporates", "OpenCorporates", "Company search without the anonymous rate limit", "https://opencorporates.com/api_accounts/new", "Free for non-commercial use on request"),
+    ("abusech", "abuse.ch auth key", "URLhaus malware URLs for domains and IPs, ThreatFox indicators, MalwareBazaar file-hash lookups", "https://auth.abuse.ch/", "Free"),
+    ("fullhunt", "FullHunt", "Attack-surface subdomain inventory for a domain", "https://fullhunt.io/", "Free tier"),
+    ("opensanctions", "OpenSanctions", "Sanctions, PEP and crime-list screening for names and companies", "https://www.opensanctions.org/api/", "Free for non-commercial use"),
+    ("companieshouse", "Companies House", "UK company and officer search by name", "https://developer.company-information.service.gov.uk/", "Free · 600 requests / 5 minutes"),
+    ("fec", "FEC (api.data.gov)", "Campaign-contribution lookups beyond the shared DEMO_KEY limit", "https://api.open.fec.gov/developers/", "Free · 1,000 requests/hour"),
+    ("courtlistener", "CourtListener", "Higher quota for court opinion and docket search (works without a key)", "https://www.courtlistener.com/help/api/rest/", "Free"),
 ];
 
 #[derive(Debug, Clone, Serialize)]

@@ -8,6 +8,7 @@ use std::time::Instant;
 use serde_json::{json, Value};
 
 use super::launchers;
+use super::netintel;
 use super::{EntityType, FindingStatus, ScanContext};
 use crate::engine::dns;
 use crate::engine::http::{build_following_client, fetch};
@@ -56,7 +57,8 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     // classification, ptr, geo, internetdb, tor, rdap, 6 launchers, + one per keyed service
     let keyed = ["shodan", "ipinfo", "abuseipdb", "virustotal", "greynoise", "pulsedive", "ipqs"].iter().filter(|k| ctx.secret(k).is_some()).count()
         + usize::from(ctx.secret("censys_id").is_some() && ctx.secret("censys_secret").is_some())
-        + 1; // OTX passive DNS runs with or without a key
+        + 2 * usize::from(ctx.secret("abusech").is_some())
+        + 3; // OTX passive DNS, ipwho.is and HackerTarget reverse IP run with or without a key
     let catalog = launchers::plan(EntityType::Ip, &launchers::vars_ip(&ip.to_string()));
     ctx.start(if public { 12 + keyed + catalog.len() } else { 2 });
 
@@ -234,6 +236,14 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
         }
     }
     ctx.emit(rdap);
+
+    // Free network intel.
+    ctx.emit(netintel::ipwho(&ctx, &ip.to_string()).await);
+    ctx.emit(netintel::hackertarget_reverse_ip(&ctx, &ip.to_string()).await);
+    if let Some(key) = ctx.secret("abusech") {
+        ctx.emit(netintel::urlhaus_host(&ctx, &ip.to_string(), key).await);
+        ctx.emit(netintel::threatfox(&ctx, &ip.to_string(), key).await);
+    }
 
     // Keyed services.
     if let Some(key) = ctx.secret("shodan") {

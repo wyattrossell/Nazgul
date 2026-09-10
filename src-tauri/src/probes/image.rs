@@ -14,6 +14,7 @@ use serde_json::json;
 use sha2::Sha256;
 
 use super::launchers;
+use super::netintel;
 use super::{EntityType, FindingStatus, ScanContext};
 
 fn rational_to_deg(v: &Value) -> Option<f64> {
@@ -154,7 +155,7 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
     let file_launchers = launchers::plan(EntityType::Image, &launchers::vars_image(&ctx.input));
     // file + hashes + (dimensions + exif + camera + timestamp + gps + authoring | pdf | office) + reverse-image x4 + catalog
     let core = if is_pdf || is_office { 1 } else { 6 };
-    ctx.start(2 + core + 4 + file_launchers.len());
+    ctx.start(2 + core + 4 + file_launchers.len() + usize::from(ctx.secret("abusech").is_some() && !ctx.options.airgap));
 
     let size_kb = bytes.len() as f64 / 1024.0;
     ctx.emit(
@@ -175,6 +176,10 @@ pub async fn run(ctx: Arc<ScanContext>) -> Result<(), String> {
             .url(format!("https://www.virustotal.com/gui/file/{sha256}"))
             .data(json!({ "md5": md5, "sha256": sha256 })),
     );
+
+    if let (Some(key), false) = (ctx.secret("abusech"), ctx.options.airgap) {
+        ctx.emit(netintel::malwarebazaar(&ctx, &sha256, key).await);
+    }
 
     let mut gps: Option<(f64, f64)> = None;
 
