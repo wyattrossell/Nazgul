@@ -43,8 +43,13 @@
         "installerHooks": "./windows/hooks.nsh",
         "installMode": "currentUser",
         "displayLanguageSelector": false
-      }
-    }
+      },
+      "signCommand": "cmd /c sign-hook.cmd %1"
+    },
+    "publisher": "Wyatt Rossell",
+    "copyright": "Copyright (C) 2026 Wyatt Rossell",
+    "shortDescription": "Nazgul OSINT workbench",
+    "longDescription": "Nazgul is a desktop open-source-intelligence workbench that searches public data sources. Public data only; no credential access or authentication bypass."
   },
   "plugins": {
     "updater": {

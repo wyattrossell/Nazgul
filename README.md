@@ -128,11 +128,60 @@ git tag v0.2.1
 git push origin main --tags
 ```
 
-The `release` GitHub Actions workflow builds the signed installer, creates the release and
+The `release` GitHub Actions workflow builds the installer, creates the release and
 uploads `latest.json` for the updater. It needs two repository secrets:
 `TAURI_SIGNING_PRIVATE_KEY` (contents of `~/.tauri/nazgul.key`) and
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (empty if the key has none). Keep the private key safe;
-without it no future update can be signed.
+without it no future update can be signed. That key signs only the *update manifest*; it is
+not the Authenticode certificate described below.
+
+## Code signing (Defender / SentinelOne trust)
+
+Endpoint protection blocks unknown, unsigned executables. Authenticode signing gives Nazgul a
+verifiable publisher so security tools, and the people who run them, can recognise it. This is
+separate from the updater key above.
+
+Two kinds of signing here:
+
+| | Authenticode (this section) | Updater key (`~/.tauri/nazgul.key`) |
+|---|---|---|
+| Signs | `nazgul.exe` and the installer | the `latest.json` update manifest |
+| Trusted by | Windows, Defender, SentinelOne | the running app, for updates |
+| Certificate | a code-signing cert | a minisign keypair |
+
+**Create a signing certificate** (self-signed; free):
+
+```
+powershell -File scripts/new-selfsigned-cert.ps1
+```
+
+It writes `certs/nazgul-codesign.cer` (public, shareable) and `certs/nazgul-codesign.pfx`
+(private, gitignored) and prints the thumbprint.
+
+**Sign local builds:** put `scripts` on PATH (the bundler invokes `sign-hook.cmd` by name),
+set the thumbprint, then build. `scripts/sign.ps1` signs the exe and the installer with an
+RFC-3161 timestamp. With no certificate configured it skips signing, so ordinary builds and
+forks are unaffected.
+
+```
+$env:PATH = "$PWD\scripts;$env:PATH"
+$env:NAZGUL_CERT_THUMBPRINT = "<thumbprint>"
+npm run tauri build
+```
+
+**Sign in CI:** add repository secrets `WINDOWS_CERT_PFX_BASE64` (base64 of the `.pfx`) and
+`WINDOWS_CERT_PASSWORD`; the release workflow signs automatically when they are present.
+
+**Getting it to run on a managed work machine:** a self-signed certificate is trusted only
+after its public `.cer` is added to the machine's Trusted Publishers store, which needs an
+administrator or a policy push. On a machine you do not administer, hand
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and the `.cer` to your IT/security team; it lists the
+publisher, the network endpoints and why, the update mechanism, and how to allowlist. A
+purchased OV/EV certificate or Azure Trusted Signing chains to an already-trusted root and
+needs no per-machine step; point the same `NAZGUL_CERT_THUMBPRINT` or PFX secrets at it.
+
+If Defender flags a build, submit it at
+https://www.microsoft.com/en-us/wdsi/filesubmission to have it re-scored.
 
 ## Run it
 
