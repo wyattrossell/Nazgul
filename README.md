@@ -116,15 +116,17 @@ installer is per-user (no admin prompt), adds a Start Menu entry and always plac
 shortcut on the desktop.
 
 On every launch the app checks the latest release on GitHub. When a newer signed build exists a
-banner offers **Install and restart**; the download is verified against the public key baked
-into the app before the installer runs. Settings has a manual **Check for updates** button.
+prompt shows the version and release notes and offers **Update now** or **Later**. Update now
+downloads the installer, verifies it against the public key baked into the app, installs it and
+restarts Nazgul. Later hides the prompt until the next launch; Settings > Updates keeps an
+**Install and restart** button for the postponed release and a manual **Check for updates**.
 Airgap mode skips the check. Releases must be publicly reachable for the updater to see them.
 
 Publishing a release (maintainer):
 
 ```
 # bump "version" in package.json, src-tauri/tauri.conf.json and src-tauri/Cargo.toml, commit, then
-git tag v0.2.1
+git tag v0.2.2
 git push origin main --tags
 ```
 

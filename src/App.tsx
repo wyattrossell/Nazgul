@@ -4,7 +4,7 @@ import { api, errorText, listenToScans } from "./lib/api";
 import { drainQueue } from "./lib/scans";
 import { effectiveProxy, useStore, type View } from "./store";
 import { BootSplash } from "./components/BootSplash";
-import { UpdateBanner } from "./components/UpdateBanner";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 import { TopBar } from "./components/TopBar";
 import { Rail } from "./components/Rail";
 import { Inspector } from "./components/Inspector";
@@ -108,8 +108,8 @@ export default function App() {
   return (
     <div className="shell">
       {booting && <BootSplash route={routeLabel} onDone={finishBoot} />}
+      {!booting && <UpdatePrompt />}
       <TopBar />
-      <UpdateBanner />
       <Rail />
       <main className="main">
         {view === "probes" && <ProbeView />}

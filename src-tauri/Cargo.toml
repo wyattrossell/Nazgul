@@ -1,6 +1,6 @@
 [package]
 name = "nazgul"
-version = "0.2.1"
+version = "0.2.2"
 description = "Nazgul - retro-terminal desktop OSINT workbench"
 authors = ["Wyatt"]
 edition = "2021"

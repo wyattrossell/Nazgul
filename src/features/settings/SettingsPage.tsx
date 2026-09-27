@@ -23,7 +23,9 @@ export function SettingsPage() {
   const [plugins, setPlugins] = useState<PluginList | null>(null);
   const [update, setUpdateLocal] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
   const setUpdate = useStore((s) => s.setUpdate);
+  const pendingUpdate = useStore((s) => s.update);
 
   const checkUpdate = async () => {
     setCheckingUpdate(true);
@@ -35,6 +37,17 @@ export function SettingsPage() {
       setUpdateLocal({ available: false, current: info?.version ?? "?", version: null, notes: null, date: null, error: errorText(e) });
     } finally {
       setCheckingUpdate(false);
+    }
+  };
+
+  const installUpdate = async () => {
+    setInstallingUpdate(true);
+    pushLog("info", `downloading Nazgul v${pendingUpdate?.version}…`);
+    try {
+      await api.installUpdate();
+    } catch (e) {
+      setInstallingUpdate(false);
+      pushLog("bad", `update failed: ${errorText(e)}`);
     }
   };
 
@@ -296,15 +309,19 @@ export function SettingsPage() {
           <button type="button" className="btn sm" onClick={checkUpdate} disabled={checkingUpdate || settings.airgap}>
             {checkingUpdate ? "Checking…" : "Check for updates"}
           </button>
-          {update && (
-            <span className={`status ${update.available ? "found" : update.error ? "error" : "info"}`}>
-              {update.available ? `v${update.version} available` : update.error ? update.error : "up to date"}
-            </span>
+          {pendingUpdate?.available && (
+            <button type="button" className="btn sm primary" onClick={installUpdate} disabled={installingUpdate}>
+              {installingUpdate ? "Downloading…" : `Install v${pendingUpdate.version} and restart`}
+            </button>
+          )}
+          {update && !pendingUpdate?.available && (
+            <span className={`status ${update.error ? "error" : "info"}`}>{update.error ? update.error : "up to date"}</span>
           )}
         </div>
         <span className="help">
-          Checked automatically on every launch against the latest GitHub release (github.com/wyattrossell/Nazgul). Builds
-          are signature-verified before they install. Airgap mode skips the check.
+          Checked automatically on every launch against the latest GitHub release (github.com/wyattrossell/Nazgul). A newer
+          build opens a prompt to update now or later; a postponed update can be installed from here. Builds are
+          signature-verified before they install. Airgap mode skips the check.
         </span>
       </div>
 
